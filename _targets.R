@@ -36,7 +36,7 @@ list(
 
   tar_target(
     glider_leaflet,
-    leaflet_map(glider_track = glider_trk, pth = "docs/glider_trk.html"),
+    leaflet_map(glider_track = glider_trk, pth = "docs/index.html"),
     format = "file"
   )
 )
