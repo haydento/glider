@@ -1,0 +1,11 @@
+name|type|data|command|depend|seed|path|time|size|bytes|format|iteration|parent|children|seconds|warnings|error
+to_dd|function|c6ca126321670da3||||||||||||||
+leaflet_map|function|89739a6b724c84d0||||||||||||||
+combine|function|437a297485d7010d||||||||||||||
+clean|function|5e415a1fa55f0d01||||||||||||||
+sci_data|stem|8744811266a90495|afce6c85c116a1aa|ef46db3751d8e999|-1152894817|data/ascii_depth_lat_lon_alt_temp.txt|t18892.8557182099s|0cea099b81df98f8|30365|file|vector|||1.14|package leaflet.extras was built under R version 3.6.3|
+mission_data|stem|ce64bbd3d8fba728|69e5dfa0b3d0428d|ef46db3751d8e999|1364370113|data/ascii_depth_lat_lon_pitch_roll.txt|t18892.8557172449s|f3b732fa13291c98|30782|file|vector|||0||
+clean_sci|stem|0bd5a94d48427ef7|8082150c8714f8f0|a67bca9d29ea5c65|-728918983||t18892.8593552653s|4a82f12c7d9fb2a6|23885|fst_dt|vector|||0.02||
+clean_mission|stem|8b5270586e867d39|b66200d00072c71d|8796063d43bb6288|1754218170||t18892.8593555076s|e4e72c63e20df3c6|21735|fst_dt|vector|||0||
+glider_trk|stem|7d1c585d2bce885d|517120a93fe1215d|96af2018126808a5|1929468799||t18892.8593557035s|32d3b4fa37cf6c1a|7151|fst_dt|vector|||0||
+glider_leaflet|stem|d15e6cdc9940598c|601c4c239c7b7dca|49cc4843c909c87c|-327173533|docs/index.html|t18892.8593771037s|420faa22f01838a4|840196|file|vector|||1.86||

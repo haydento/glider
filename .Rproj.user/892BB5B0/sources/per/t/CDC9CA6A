@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1632343283619.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3674575749",
+    "id" : "CDC9CA6A",
+    "lastKnownWriteTime" : 1632343658,
+    "last_content_update" : 1632343658690,
+    "path" : "C:/holbrook/projects/raeon_gliders/glider/glider/_targets.R",
+    "project_path" : "glider/_targets.R",
+    "properties" : {
+        "cursorPosition" : "4,23",
+        "scrollLine" : "0"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
