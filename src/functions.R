@@ -23,13 +23,23 @@ to_dd <- function(x){
 #' @param lon column in file containing longitude values
 #' @return function returns data table of cleaned table
 #' @examples
-#' clean("data/ascii_depth_lat_lon_alt_temp.txt", lat = m_gps_lat, lon = m_gps_lon)
+#' #single file
+#' clean("data/glider_decimated/science/ascii_depth_lat_lon_alt_temp_1632243087.txt", 
+#'       lat = m_gps_lat, lon = m_gps_lon)
+#'
+#' #multiple files
+#' pth_files <- list.files("data/glider_decimated/mission", full.names = TRUE)
+#' clean(pth_files[1:2], lat = m_gps_lat, lon = m_gps_lon)
 
 clean <- function(pth, lat = m_gps_lat, lon = m_gps_lon){
-  header <- fread(pth, nrows = 0)
-  dta <- fread(pth, skip = 2, na.strings = "NaN")
-  setnames(dta, names(dta), names(header))
-  set(dta, j="time", value = as.POSIXct(dta$time, origin = "1970-01-01 00:00:00", tz = "UTC"))
+  header <- data.table::fread(pth[1], nrows = 0)
+  dta_list <- lapply(pth, data.table::fread, skip = 2, na.strings = "NaN")
+  dta <- data.table::rbindlist(dta_list)
+  data.table::setnames(dta, names(dta), names(header))
+  data.table::set(dta, j="time", 
+                  value = as.POSIXct(dta$time, 
+                                     origin = "1970-01-01 00:00:00", 
+                                     tz = "UTC"))
   dta[, lat_dd := to_dd(m_gps_lat)]
   dta[, lon_dd := to_dd(m_gps_lon)]
   return(dta)
@@ -42,8 +52,8 @@ clean <- function(pth, lat = m_gps_lat, lon = m_gps_lon){
 #' @param y mission data
 
 combine <- function(x,y){  
-  x <- x[!(is.na(m_gps_lon) | is.na(m_gps_lat)),]
-  y <- y[!(is.na(m_gps_lon) | is.na(m_gps_lat)),]
+  #x <- x[!(is.na(m_gps_lon) | is.na(m_gps_lat)),]
+  #y <- y[!(is.na(m_gps_lon) | is.na(m_gps_lat)),]
   out <- rbind(x, y, fill = TRUE)
   setkey(out, time)
 }
@@ -56,7 +66,9 @@ combine <- function(x,y){
 #' tar_load(glider_trk) 
 #' leaflet_map(glider_track = glider_trk, pth = "output/test.html")
 
-leaflet_map <- function(glider_track = f3, pth){
+leaflet_map <- function(glider_track = f3, 
+                        dtc = clean_vem_detections, 
+                        pth){
 
   m <- leaflet()
   m <- setView(m, zoom = 15, lat = 45.537 , lng = -83.999)
@@ -65,9 +77,16 @@ leaflet_map <- function(glider_track = f3, pth){
   m <- addTiles(m, urlTemplate = "http://tileservice.charts.noaa.gov/tiles/50000_1/{z}/{x}/{y}.png", group = "nav chart")
   m <- addProviderTiles(m, providers$Esri.WorldImagery, group = "satellite")
   m <- addProviderTiles(m, providers$Esri.NatGeoWorldMap, group = "alt")
+  #drop missing lat/lon
+  glider_track <- glider_track[!(is.na(lon_dd) | is.na(lat_dd)),]
   m <- addPolylines(map = m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green")
+  
   #  m <- addMarkers(m, lng = -83.58845, lat = 44.08570, label = "release")
   m <- addCircleMarkers(m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "red", radius = 5, stroke = FALSE, fillOpacity = 1)
+
+  #add detection locations
+  m <- addCircleMarkers(map = m, data = dtc, lng = ~lon_dd, lat = ~lat_dd, color = "yellow", radius = 3, stroke = FALSE, fillOpacity = 1)
+  
   m <- leafem::addMouseCoordinates(m)
   m <- addMeasure(m, primaryLengthUnit = "meters", secondaryLengthUnit = "kilometers")  
   m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), position = "bottomright", options = layersControlOptions(collapsed = FALSE))

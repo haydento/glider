@@ -5,15 +5,16 @@ source("src/vem.R")
 tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr"))
 
 list(
+
   tar_target(
     sci_data,
-    "data/glider_decimated/ascii_depth_lat_lon_alt_temp.txt",
+    list.files("data/glider_decimated/science", full.names = TRUE),
     format = "file"
   ),
 
   tar_target(
     mission_data,
-    "data/glider_decimated/ascii_depth_lat_lon_pitch_roll.txt",
+    list.files("data/glider_decimated/mission", full.names = TRUE),
     format = "file"
   ),
 
@@ -34,10 +35,29 @@ list(
     combine(x = clean_mission, y = clean_sci),
     format = "fst_dt"
   ),
+  
+  tar_target(
+    vem_data,
+    list.files("data/vem", full.names = TRUE),
+    format = "file"
+  ),
+  
+  tar_target(
+    clean_vem_status,
+    read_vem(vem_data)$status,
+    format = "fst_dt"
+  ),
+  
+  tar_target(
+    clean_vem_detections,
+    infer_detection_locations(read_vem(vem_data)$detections, glider_trk),
+    format = "fst_dt"
+  ),
 
   tar_target(
     glider_leaflet,
-    leaflet_map(glider_track = glider_trk, pth = "docs/index.html"),
+    leaflet_map(glider_track = glider_trk, dtc = clean_vem_detections, 
+                pth = "docs/index.html"),
     format = "file"
   )
 )
