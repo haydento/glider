@@ -7,13 +7,13 @@ tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "l
 list(
   tar_target(
     sci_data,
-    "data/ascii_depth_lat_lon_alt_temp.txt",
+    "data/glider_decimated/ascii_depth_lat_lon_alt_temp.txt",
     format = "file"
   ),
 
   tar_target(
     mission_data,
-    "data/ascii_depth_lat_lon_pitch_roll.txt",
+    "data/glider_decimated/ascii_depth_lat_lon_pitch_roll.txt",
     format = "file"
   ),
 
