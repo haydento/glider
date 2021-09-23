@@ -1,11 +1,18 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|iteration|parent|children|seconds|warnings|error
-clean_sci|stem|0bd5a94d48427ef7|8082150c8714f8f0|a67bca9d29ea5c65|-728918983||t18892.8593552653s|4a82f12c7d9fb2a6|23885|fst_dt|vector|||0.02||
-clean_mission|stem|8b5270586e867d39|b66200d00072c71d|8796063d43bb6288|1754218170||t18892.8593555076s|e4e72c63e20df3c6|21735|fst_dt|vector|||0||
-glider_trk|stem|7d1c585d2bce885d|517120a93fe1215d|96af2018126808a5|1929468799||t18892.8593557035s|32d3b4fa37cf6c1a|7151|fst_dt|vector|||0||
+sci_data|stem|8744811266a90495|4082ce87ebe870f9|88559740b2c6d4c9|-1152894817|data/glider_decimated/science/ascii_depth_lat_lon_alt_temp_1632243087.txt|t18892.8557182099s|0cea099b81df98f8|30365|file|vector|||1.17|package leaflet.extras was built under R version 3.6.3|
+clean_sci|stem|0bd5a94d48427ef7|8082150c8714f8f0|f6d9abe718915378|-728918983||t18893.0972761301s|4a82f12c7d9fb2a6|23885|fst_dt|vector|||0.04||
+clean_vem|stem|ed485468aab50876|7bec06146c126374|761c981f66d9c100|1793711328||t18893.1320402099s|365a11d412056b31|4444|fst_dt|vector|||1.43|package leaflet.extras was built under R version 3.6.3|
+vem_data|stem|c6d11c5637b34ae0|7d93859a853fe953|88559740b2c6d4c9|-1621147507|data/vem/ui212121.vem*data/vem/ui212201.vem*data/vem/ui220050.vem|t18893.1373819837s|3244a7ba405c79e8|39901|file|vector|||1.17|package leaflet.extras was built under R version 3.6.3|
+clean_vem_status|stem|e4447f2ca0fb4232|18d71773745ed784|35693b1f12bf0cab|-764204528||t18893.1516284721s|1004091f82f3d01e|33105|fst_dt|vector|||1.34|1 record was ignored from ui212121.vem line 161 because of invalid datetime.|
+mission_data|stem|dd1e0d3565bf0257|b1559b0d7142104e|88559740b2c6d4c9|1364370113|data/glider_decimated/mission/ascii_depth_lat_lon_pitch_roll_1632243087.txt*data/glider_decimated/mission/ascii_depth_lat_lon_pitch_roll_1632283990.txt|t18893.080728519s|0e36147bcd06b1ef|53183|file|vector|||2.13|package leaflet.extras was built under R version 3.6.3|
+clean_mission|stem|c5a00ca61e0b8fdb|b66200d00072c71d|243cca5fdd8842a3|1754218170||t18893.1804981793s|38057af74f326a2c|34026|fst_dt|vector|||0.03||
+glider_trk|stem|e139ac1ebd8ae572|517120a93fe1215d|b567771c6660e843|1929468799||t18893.1854385353s|c3f4a5eb31dbdde2|49245|fst_dt|vector|||1.06|package leaflet.extras was built under R version 3.6.3|
+clean_vem_detections|stem|5cb856b3938f7fa7|4374ca866eea6e52|d7e0544760301aa2|-993425187||t18893.1901923478s|623d1439575b8491|19602|fst_dt|vector|||1.29|1 record was ignored from ui212121.vem line 161 because of invalid datetime.|
 to_dd|function|c6ca126321670da3||||||||||||||
-leaflet_map|function|89739a6b724c84d0||||||||||||||
-combine|function|437a297485d7010d||||||||||||||
-clean|function|5e415a1fa55f0d01||||||||||||||
-sci_data|stem|8744811266a90495|e76d38f9df09d867|ef46db3751d8e999|-1152894817|data/glider_decimated/ascii_depth_lat_lon_alt_temp.txt|t18892.8557182099s|0cea099b81df98f8|30365|file|vector|||1.48|package leaflet.extras was built under R version 3.6.3|
-mission_data|stem|ce64bbd3d8fba728|87d8331ff545119c|ef46db3751d8e999|1364370113|data/glider_decimated/ascii_depth_lat_lon_pitch_roll.txt|t18892.8557172449s|f3b732fa13291c98|30782|file|vector|||0||
-glider_leaflet|stem|d15e6cdc9940598c|601c4c239c7b7dca|49cc4843c909c87c|-327173533|docs/index.html|t18893.057026941s|420faa22f01838a4|840196|file|vector|||1.86||
+leaflet_map|function|d3d2ed68071cbe77||||||||||||||
+infer_detection_locations|function|8994030c8737d9d4||||||||||||||
+.read_vem|function|bdef09235bb567da||||||||||||||
+combine|function|2de08c3eef542cc2||||||||||||||
+clean|function|c056e013fd277807||||||||||||||
+read_vem|function|d3378d31fc8861ec||||||||||||||
+glider_leaflet|stem|6b59b0223f7a4fa4|9f3f30aaed742b15|b6cc499216d59905|-327173533|docs/index.html|t18893.1934691398s|fcfe7121387af25b|850564|file|vector|||1.97|package leaflet.extras was built under R version 3.6.3|
