@@ -69,6 +69,7 @@ combine <- function(x,y){
 leaflet_map <- function(glider_track = f3, 
                         dtc = clean_vem_detections, 
                         pth){
+  recs <- fst::read_fst("data/receiver_coords.fst")
 
   m <- leaflet()
   m <- setView(m, zoom = 15, lat = 45.537 , lng = -83.999)
@@ -83,6 +84,7 @@ leaflet_map <- function(glider_track = f3,
   
   #  m <- addMarkers(m, lng = -83.58845, lat = 44.08570, label = "release")
   m <- addCircleMarkers(m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "red", radius = 5, stroke = FALSE, fillOpacity = 1)
+  m <- addCircleMarkers(m, data = recs, lng = ~lon, lat = ~lat, color = "blue", radius = 5, stroke = FALSE, fillOpacity = 1)
 
   #add detection locations
   m <- addCircleMarkers(map = m, data = dtc, lng = ~lon_dd, lat = ~lat_dd, color = "yellow", radius = 3, stroke = FALSE, fillOpacity = 1)
