@@ -5,3 +5,6 @@
 glider.Rproj
 .Rproj.user/
 docs/index_files/
+*~
+.DS_Store
+_targets/
