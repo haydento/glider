@@ -57,9 +57,15 @@ list(
   tar_target(
     glider_leaflet,
     leaflet_map(glider_track = glider_trk, dtc = clean_vem_detections, 
-                pth = "docs/index.html"),
+                pth = "docs/index.html", recs = recs),
     format = "file"
-  )
+  ),
+
+  tar_target(
+    recs,
+    "data/receiver_coords.fst",
+    format = "file"
+    )
 )
 
   
