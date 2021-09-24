@@ -123,15 +123,40 @@ read_vem <- function(vem_files){
     vem_tag[ , `:=`(
             signal_level_db = data.table::tstrsplit(S, "=", keep = 2)[[1]],
             noise_level_db = data.table::tstrsplit(N, "=", keep = 2)[[1]],
-            channel = data.table::tstrsplit(C, "=", keep = 2)[[1]])] 
+            channel = data.table::tstrsplit(C, "=", keep = 2)[[1]],
+            frequency = gsub("^[a-zA-Z]", "", 
+                              data.table::tstrsplit(transmitter_code_space, 
+                                                     "-", keep = 1)[[1]]))]
   } else {
     vem_tag[ , `:=`(signal_level_db = NA_real_,
                     noise_level_db = NA_real_,
-                    channel = NA_real_)][0,]
+                    channel = NA_real_,
+                    frequency = NA_character_)][0,]
   }
   
+  #coerce numeric columns and order by time
+  vem_sts[ , `:=`(serial_no = as.character(serial_no),
+                  detection_count = as.numeric(detection_count),
+                  ping_count = as.numeric(ping_count),
+                  line_voltage_volts = as.numeric(line_voltage_volts),
+                  internal_temperature_celcius = as.numeric(internal_temperature_celcius),
+                  detection_memory_used = as.numeric(detection_memory_used),
+                  raw_memory_used_percent = as.numeric(raw_memory_used_percent),
+                  output_noise = as.numeric(output_noise),
+                  output_ppm_noise = as.numeric(output_ppm_noise),
+                  tilt_x = as.numeric(tilt_x),
+                  tilt_y = as.numeric(tilt_y),
+                  tilt_z = as.numeric(tilt_z))]  
+  
   data.table::setkey(vem_sts, datetime)
+  
+  vem_tag[ , `:=`(serial_no = as.character(serial_no),
+                  sensor_value_adc = as.numeric(sensor_value_adc),
+                  signal_level_db = as.numeric(signal_level_db),
+                  noise_level_db = as.numeric(noise_level_db))]
+  
   data.table::setkey(vem_tag, datetime)
+  
   
   vem <- list(status = vem_sts, detections = vem_tag)
   
