@@ -52,9 +52,8 @@ clean <- function(pth, lat = m_gps_lat, lon = m_gps_lon){
 #' @param y mission data
 
 combine <- function(x,y){  
-  #x <- x[!(is.na(m_gps_lon) | is.na(m_gps_lat)),]
-  #y <- y[!(is.na(m_gps_lon) | is.na(m_gps_lat)),]
   out <- rbind(x, y, fill = TRUE)
+  out <- unique(out)
   setkey(out, time)
 }
 
@@ -64,12 +63,14 @@ combine <- function(x,y){
 #' @param pth output file path (character)
 #' @examples
 #' tar_load(glider_trk) 
-#' leaflet_map(glider_track = glider_trk, pth = "output/test.html")
+#' leaflet_map(glider_track = glider_trk, pth = "output/test.html", recs = "data/receiver_coords.fst")
 
-leaflet_map <- function(glider_track = f3, 
-                        dtc = clean_vem_detections, 
+leaflet_map <- function(glider_track = glider_trk, 
+                        dtc = clean_vem_detections,
+                        recs = "data/receiver_coords.fst",
                         pth){
-  recs <- fst::read_fst("data/receiver_coords.fst")
+  
+  recs <- fst::read_fst(recs)
 
   m <- leaflet()
   m <- setView(m, zoom = 15, lat = 45.537 , lng = -83.999)
