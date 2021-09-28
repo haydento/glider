@@ -55,6 +55,19 @@ list(
   ),
 
   tar_target(
+    instr_deploy_data,
+    list.files("data/instr_deploy_log", full.names = TRUE, pattern = "\\.csv$"),
+    format = "file"
+  ),  
+  
+  tar_target(
+    clean_vem_detections_geo,
+    get_instr_data(clean_vem_detections, instr_deploy_data),
+    format = "fst_dt"
+  ),
+
+  
+  tar_target(
     glider_leaflet,
     leaflet_map(glider_track = glider_trk, dtc = clean_vem_detections, 
                 pth = "docs/index.html", recs = recs),
