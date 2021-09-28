@@ -2,7 +2,7 @@ library(targets)
 source("src/functions.R")
 source("src/vem.R")
 
-tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr"))
+tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr", "geosphere"))
 
 list(
 
