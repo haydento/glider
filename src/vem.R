@@ -198,26 +198,27 @@ infer_detection_locations <- function(dtc, pos){
 #' 
 #' @examples
 #' targets::tar_load("clean_vem_detections")
-#' dtc <- clean_vem_detections
+#' dta <- clean_vem_detections
 #' 
 #' targets::tar_load("instr_deploy_data")
-#' hst <- instr_deploy_data
+#' hst_l <- instr_deploy_data
 
-get_instr_data <- function(dtc, hst){
+get_instr_data <- function(dta, hst_l){
   
-  hst_file <- hst[[1]]
-  if(length(hst) > 1) stop("Can only load one hst file. Need to expand.")
-  hst <- data.table::fread(hst_file)  
+  hst_file <- hst_l[[1]]
+  if(length(hst_l) > 1) stop("Can only load one hst file. Need to expand.")
+  hst_l <- data.table::fread(hst_file)  
   
   #set all missing timestamps to now for convenience
-  if(!inherits(hst$timestamp_end_utc, "POSIXct")) {
-    hst[ , timestamp_end_utc := as.POSIXct(timestamp_end_utc)]
-    hst[is.na(timestamp_end_utc), timestamp_end_utc := Sys.time()]
+  if(!inherits(hst_l$timestamp_end_utc, "POSIXct")) {
+    hst_l[ , timestamp_end_utc := as.POSIXct(timestamp_end_utc)]
+    hst_l[is.na(timestamp_end_utc), timestamp_end_utc := Sys.time()]
+    attributes(hst_l$timestamp_end_utc)$tzone <- "UTC"
   }
   
   #deep copy
-  dtc <- data.table::as.data.table(dtc)
-  hst <- data.table::as.data.table(hst)
+  dtc <- data.table::as.data.table(dta)
+  hst <- data.table::as.data.table(hst_l)
   
   # Rename all dtc cols to transmitter_, receiver_, glider_ col names
   
@@ -267,7 +268,12 @@ get_instr_data <- function(dtc, hst){
   # BIG JOINS
   
   # STEP 1. Non equi join hst_tag with dtc by transmitter id, datetime
-  
+
+  # A69-1601-63808 and A180-1702-61651 were not detected.  Added "nomatch = NULL" to not
+  # include records of "hst_tag" that do not match records of dtc.
+  # should be accomplish the same thing by swapping hst_tag and dtc position in join.
+  # data.table does left join where i in x[i] keeps all rows.
+  # in this case, we want all of the dtc records in the output but not any unmatched rows in hst_tag
   dtc2 <- dtc[hst_tag, on = list(datetime >= transmitter_timestamp_start_utc,
                                  datetime <= transmitter_timestamp_end_utc,
                                  transmitter_instr_id = transmitter_instr_id),
@@ -298,13 +304,12 @@ get_instr_data <- function(dtc, hst){
                        glider_lon_dd,
                        glider_lat_dd,
                        glider_m_depth
-                       )]
+                       ), nomatch = NULL]
   
 
   # STEP 2. Non equi join hst_rec with dtc by transmitter id, datetime
   
-  dtc2 <- dtc2[hst_rec, 
-                         on = list(datetime >= receiver_timestamp_start_utc,
+  dtc2 <- dtc2[hst_rec, on = list(datetime >= receiver_timestamp_start_utc,
                                    datetime <= receiver_timestamp_end_utc,
                                    receiver_serial_no = receiver_serial_no),
                   list(datetime = x.datetime, 
@@ -349,15 +354,9 @@ get_instr_data <- function(dtc, hst){
                        glider_lon_dd,
                        glider_lat_dd,
                        glider_m_depth
-                       )]  
+                       ), nomatch = NULL]  
   
-  # STEP 3. Update receiver_ and transmitter_ lonlat with glider if mary_lou
-  
-  #!!! DANGEROUS SHORTCUT HERE FOR NOW !!!!!!!!!!!!!!
-  
-  # drop is.na(datetime)??? - is this an artifact of the non-equi join?
-  #   or evidence that something went wrong???
-  dtc2 <- dtc2[!is.na(datetime)]
+  # STEP 3. Update receiver_ and transmitter_ lonlat with glider
   
   
   #Update receiver records with relevant from glider
@@ -399,3 +398,20 @@ get_instr_data <- function(dtc, hst){
   
   return(dtc2)
 }
+
+
+########################
+#' tar_load("clean_vem_detections_geo")
+#' dtc <- clean_vem_detections_geo
+#' dtc[receiver_freq == 180,]
+## targets::tar_load("clean_vem_detections_geo")
+
+## boxplot(rt_distance_meters ~ transmitter_freq,
+##         data = clean_vem_detections_geo[rt_distance_meters > 0],
+##         ylim = c(0, 2200), xlab = NA, las = 2)
+
+
+## par(mar = c(10,5,4,1))
+## boxplot(rt_distance_meters ~ transmitter_instr_id,
+##         data = clean_vem_detections_geo[rt_distance_meters > 0],
+##         ylim = c(0, 2200), xlab = NA, las = 2)
