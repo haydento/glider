@@ -8,13 +8,15 @@ list(
 
   tar_target(
     sci_data,
-    list.files("data/glider_decimated/science", full.names = TRUE),
+    #    list.files("data/glider_decimated/science", full.names = TRUE),
+    "data/glider_decimated/science",
     format = "file"
   ),
 
   tar_target(
     mission_data,
-    list.files("data/glider_decimated/mission", full.names = TRUE),
+    "data/glider_decimated/mission",
+    #list.files("data/glider_decimated/mission", full.names = TRUE),
     format = "file"
   ),
 
@@ -38,7 +40,8 @@ list(
   
   tar_target(
     vem_data,
-    list.files("data/vem", full.names = TRUE),
+    "data/vem",
+#    list.files("data/vem", full.names = TRUE),
     format = "file"
   ),
   
