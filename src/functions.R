@@ -31,7 +31,15 @@ to_dd <- function(x){
 #' pth_files <- list.files("data/glider_decimated/mission", full.names = TRUE)
 #' clean(pth_files[1:2], lat = m_gps_lat, lon = m_gps_lon)
 
-clean <- function(pth, lat = m_gps_lat, lon = m_gps_lon){
+
+clean <- function(pth, lat = m_pth_lat, lon = m_gps_lon){
+  pth_files <- list.files(pth, full.names = TRUE)
+  out <- .clean(pth_files, lat = lat, lon = lon)
+return(out)
+}
+
+.clean <- function(pth, lat = m_gps_lat, lon = m_gps_lon){
+
   header <- data.table::fread(pth[1], nrows = 0)
   dta_list <- lapply(pth, data.table::fread, skip = 2, na.strings = "NaN")
   dta <- data.table::rbindlist(dta_list)

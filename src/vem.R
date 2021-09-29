@@ -15,7 +15,7 @@
 #' 
 #' @export
 read_vem <- function(vem_files){
- 
+   vem_files <- list.files(vem_files, full.names = TRUE)
   #read data from each vem file and combine
   vem <- list(
     status = data.table::rbindlist(lapply(vem_files, 
