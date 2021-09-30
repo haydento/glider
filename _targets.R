@@ -62,8 +62,9 @@ list(
     list.files("data/instr_deploy_log", full.names = TRUE, pattern = "\\.csv$"),
     format = "file"
   ),  
-  
-  tar_target(
+
+  # just detections with receiver-tag distances calculated and tag/receiver info added
+  tar_target( 
     clean_vem_detections_geo,
     get_instr_data(clean_vem_detections, instr_deploy_data),
     format = "fst_dt"
@@ -72,7 +73,7 @@ list(
   
   tar_target(
     glider_leaflet,
-    leaflet_map(glider_track = glider_trk, dtc = clean_vem_detections, 
+    leaflet_map(glider_track = glider_trk, dtc = clean_vem_detections_geo, 
                 pth = "docs/index.html", recs = recs),
     format = "file"
   ),
