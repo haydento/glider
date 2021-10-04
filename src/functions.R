@@ -1,5 +1,85 @@
 # functions used to extract science and mission data from glider and create leaflet map
 
+#' @title extract vrls
+#' @description function opens and creates csv files from each vrl file
+#' @param in_pth path to directory that contains raw vrl files
+#' @param out_dir  path to directory where extracted vrl files will be written as .csv files
+#' @param vdat_pth  pth to directory that contains vdat command line program
+#' @examples
+#' tar_load("vrl_data")
+#' extract_vrl(in_pth = "~/Desktop/lost_AR_data/vrl", out_dir = "~/Desktop/vrl_to_csv", vdat_pth = "/home/todd/tools")
+#' in_pth = "~/Desktop/lost_AR_data/vrl"
+#' out_dir = "~/Desktop/vrl_to_csv"
+#' vdat_pth = "/home/todd/tools"
+
+extract_vrl <- function(in_pth, out_dir, vdat_pth){
+  tdir <- tempdir()
+  tdir_arg <- sprintf("--output=%s", tdir)
+  
+  fls <- list.files(path = in_pth, pattern="*.vrl", full.names = TRUE)
+  fls_arg <- paste(shQuote(fls), collapse= " ")
+   
+  vdat_pth <- file.path(path.expand(vdat_pth), "vdat")
+
+  out_dir <- path.expand(out_dir)
+  out_names <- sub(".vrl$", ".csv", x = basename(fls))
+  temp_out <- file.path(tdir, out_names)
+  final_files <- file.path(out_dir, out_names)
+
+  system2(vdat_pth, c("convert", "--format=csv.fathom", "--timec=default", tdir_arg, fls_arg))
+
+  file.copy(temp_out, out_dir, overwrite = TRUE)
+  file.remove(temp_out)
+  
+  return(final_files)
+}
+
+
+#' @title compile directory of vdat vrl files into single object
+#' @description compiles detection data from vdat files extracted from vrl files.  Vdat command line program is used to create vdat files for each vrl.  Function compiles data from each vrl and changes column names to something sane.
+#' @param pth path to directory that contains vrl files
+
+#' @return pth path to directory that contains .csv files extracted from .vrl files with vdat software
+#' 
+#' @examples
+#' fls <- list.files("~/Documents/glider_range_test_results_2021/data/vdat_csv", full.names = TRUE)
+
+#' compile_det(pth = pth)
+compile_dtc <- function(fls){
+  name_col <- names(fread(cmd = paste("grep -iw DET_DESC", fls[1])))
+  int_trans <- paste("grep -iw", "DET", fls)
+  trans <- lapply(int_trans, function(x) fread(cmd = x))
+  trans <- rbindlist(trans)
+  setnames(trans, paste0("V", 1:length(name_col)), name_col)
+  ## trans[Model == "VR2Tx-69", frequency := 69]
+  ## trans[Model == "VR2W-180", frequency := 180]
+  ## set(trans, j = "sequence", value =1)
+  ## set(trans, j = "channel", value = 0)
+  ## set(trans, j = "transmitter_code_space", value = "todo")
+  ## set(trans, j = "datetime", value = fasttime::fastPOSIXct(trans$Time, tz = "UTC"))
+  ## setnames(trans, c("Serial Number", "ID", "Sensor Value", "Signal Strength (dB)", "Noise (dB)"), c("serial_no", "transmitter_id", "sensor_value_adc", "signal_level_db", "noise_level_db"))
+  ## trans <- trans[, c("serial_number", "sequence", "datetime", "transmitter_code_space", "transmitter_id", "source_file", "sensor_value_adc", "signal_level_db", "noise_level_db", "channel", "frequency")]
+
+  
+
+  
+  
+  ## set(trans, j = "run_id", value = 1)
+  ## set(trans, j = "run", value = 1)
+  ## set(trans, j = "instr", value = "tag")
+  ## set(trans, j = "mooring_type", value = "stationary")
+  ## trans[, source_file := "todo"]
+  ## trans <- trans[, c("Time", "Serial Number", "channel", "frequency",  "source_file", "Noise (dB)")]
+  ## setnames(trans, names(trans), c("datetime", "serial_no", "channel", "frequency", "source_file", "noise_level_db"))
+  
+
+
+
+  
+  return(trans)
+}
+
+
 #' @title utility function to convert lat/lon in sci and mission data to decimal degrees
 #' @param x vector of lat or lons, either science or mission data with lat and lon
 #' @description function called within "clean" function
