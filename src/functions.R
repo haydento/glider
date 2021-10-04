@@ -209,8 +209,9 @@ leaflet_map <- function(glider_track = glider_trk,
   glider_track <- glider_track[!(is.na(lon_dd) | is.na(lat_dd)),]
   m <- addPolylines(map = m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green")
 
+  #vps
   m <- addPolylines(map = m, data = vps, lng = ~Longitude, lat = ~Latitude, color = "purple", group = "vps")
-  m <- addCircleMarkers(m, data = vps, lng = ~Longitude, lat = ~Latitude, color = ~color_pal, radius = 10, stroke = FALSE, fillOpacity = 1)
+  m <- addCircleMarkers(m, data = vps, lng = ~Longitude, lat = ~Latitude, color = ~color_pal, radius = 10, stroke = FALSE, fillOpacity = 1, group = "vps")
   
   #  m <- addMarkers(m, lng = -83.58845, lat = 44.08570, label = "release")
   m <- addCircleMarkers(m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green", radius = 5, stroke = FALSE, fillOpacity = 1)
