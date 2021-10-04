@@ -2,7 +2,7 @@ library(targets)
 source("src/functions.R")
 source("src/vem.R")
 
-tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr", "geosphere"))
+tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr", "geosphere", "leafem"))
 
 list(
 
@@ -82,7 +82,29 @@ list(
     recs,
     "data/receiver_coords.fst",
     format = "file"
+  ),
+
+  tar_target(
+    vrl_data,
+    "data/vrl/VRL",
+    format = "file"
+  ),
+
+  tar_target(
+    vdat_csv,
+    extract_vrl(in_pth = vrl_data, out_dir = "data/vdat_csv", vdat_pth = "/home/todd/tools"),
+    format = "file"
+  ),
+
+  tar_target(
+    dtc,
+    compile_dtc(fls = vdat_csv),
+    format = "fst_dt"
     )
+    
+  
+    
+ 
 )
 
 
@@ -108,13 +130,6 @@ list(
 ## pdf("output/180_receivers_tag_receiver_dist.pdf")
 ## hist(dtc$rt_distance_meters, xlab = "tag receiver distance (m)", main = "tag-receiver distance")
 ## dev.off()
-
-
-
-
-
-
-
 
 ## dtc <- clean_vem_detections_geo[transmitter_freq == "69" & transmitter_mooring_type == "stationary" & transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H"), ]
 ## dtc[, id := paste(transmitter_instr_model, transmitter_site, sep = ",")]
