@@ -74,11 +74,42 @@ combine <- function(x,y){
 #' leaflet_map(glider_track = glider_trk, pth = "output/test.html", recs = "data/receiver_coords.fst")
 
 leaflet_map <- function(glider_track = glider_trk, 
-                        dtc = clean_vem_detections,
+                        dtc = clean_vem_detections_geo,
                         recs = "data/receiver_coords.fst",
                         pth){
   
   recs <- fst::read_fst(recs)
+  MBU1_180 <- dtc[receiver_site == "mary_lou" & receiver_freq == 180 & transmitter_site == "MBU-001",]
+  MBU1_180_dtc_ct <- nrow(MBU1_180)
+
+  MBU1_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  MBU1_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_180_dtc_ct)]
+
+  MBU2_180 <- dtc[receiver_site == "mary_lou" & receiver_freq == 180 & transmitter_site == "MBU-002",]
+  MBU2_180_dtc_ct <- nrow(MBU2_180)
+  
+  MBU2_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  MBU2_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_180_dtc_ct)]
+
+  ##################
+  MBU1_69 <- dtc[receiver_site == "mary_lou" & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & transmitter_site == "MBU-001" ,]
+  MBU1_69_dtc_ct <- nrow(MBU1_69)
+
+  MBU1_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  MBU1_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_69_dtc_ct)]
+
+  MBU2_69 <- dtc[receiver_site == "mary_lou" & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & receiver_freq == 69 & transmitter_site == "MBU-002",]
+  MBU2_69_dtc_ct <- nrow(MBU2_69)
+  
+  MBU2_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  MBU2_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_69_dtc_ct)]
+
+  ################
+  self_dtc_180 <- dtc[receiver_site == "mary_lou" & transmitter_site == "mary_lou" & receiver_freq == 180,]
+  self_dtc_180[, label := sprintf("180kHz, ML depth (m): %.1f; dtc date: %s", glider_m_depth, format(datetime, "%Y-%m-%d %H:%M"))]
+  self_dtc_69 <- dtc[receiver_site == "mary_lou" & transmitter_site == "mary_lou" & receiver_freq == 69,]
+  self_dtc_69[, label := sprintf("69kHz, ML depth (m): %.1f; dtc date: %s", glider_m_depth, format(datetime, "%Y-%m-%d %H:%M"))]
+  
 
   m <- leaflet()
   m <- setView(m, zoom = 15, lat = 45.537 , lng = -83.999)
@@ -92,15 +123,32 @@ leaflet_map <- function(glider_track = glider_trk,
   m <- addPolylines(map = m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green")
   
   #  m <- addMarkers(m, lng = -83.58845, lat = 44.08570, label = "release")
-  m <- addCircleMarkers(m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "red", radius = 5, stroke = FALSE, fillOpacity = 1)
-  m <- addCircleMarkers(m, data = recs, lng = ~lon, lat = ~lat, color = "blue", radius = 5, stroke = FALSE, fillOpacity = 1)
+  m <- addCircleMarkers(m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green", radius = 5, stroke = FALSE, fillOpacity = 1)
+  m <- addCircleMarkers(m, data = recs, lng = ~lon, lat = ~lat, color = "blue", radius = 8, stroke = FALSE, fillOpacity = 1)
 
-  #add detection locations
-  m <- addCircleMarkers(map = m, data = dtc, lng = ~lon_dd, lat = ~lat_dd, color = "yellow", radius = 3, stroke = FALSE, fillOpacity = 1)
+  #add MBU-001-180 receiver and detections
+  m <- addCircleMarkers(map = m, data = MBU1_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180deep", label = ~receiver_label)
+  
+  m <- addCircleMarkers(map = m, data = MBU1_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180deep", label = ~tag_label)
+  #add MBU-002-180 receiver and detections
+  m <- addCircleMarkers(map = m, data = MBU2_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180shallow", label = ~receiver_label)
+  m <- addCircleMarkers(map = m, data = MBU2_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180shallow", label = ~tag_label)
+
+  # add MBU-001-69 detections
+    m <- addCircleMarkers(map = m, data = MBU1_69, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69deep", label = ~receiver_label)
+  
+  m <- addCircleMarkers(map = m, data = MBU1_69, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69deep", label = ~tag_label)
+  #add MBU-002-180 receiver and detections
+  m <- addCircleMarkers(map = m, data = MBU2_69, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69shallow", label = ~receiver_label)
+  m <- addCircleMarkers(map = m, data = MBU2_69, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69shallow", label = ~tag_label)
+
+  # self dtc-180
+  m <- addCircleMarkers(map = m, data = self_dtc_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, colo = "orange", radius = 9, stroke = FALSE, fillOpacity = 1, group = "self-dtc,180", label = ~label)
+  m <- addCircleMarkers(map = m, data = self_dtc_69, lng = ~transmitter_longitude, lat = ~transmitter_latitude, colo = "orange", radius = 9, stroke = FALSE, fillOpacity = 1, group = "self-dtc,69", label = ~label)
   
   m <- leafem::addMouseCoordinates(m)
   m <- addMeasure(m, primaryLengthUnit = "meters", secondaryLengthUnit = "kilometers")  
-  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), position = "bottomright", options = layersControlOptions(collapsed = FALSE))
+  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("Tag-180deep", "Tag-180shallow", "Tag-69deep", "Tag-69shallow", "self-dtc,180", "self-dtc,69"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
 
   htmlwidgets::saveWidget(m, pth)
   return(pth)
