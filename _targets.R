@@ -100,7 +100,14 @@ list(
     dtc,
     compile_dtc(fls = vdat_csv),
     format = "fst_dt"
-    )
+  ),
+
+  tar_target(
+    vps,
+    "data/vps/synthetic.positions/all.csv",
+    format = "file"
+  )
+
     
   
     
