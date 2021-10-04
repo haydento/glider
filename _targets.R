@@ -74,7 +74,7 @@ list(
   tar_target(
     glider_leaflet,
     leaflet_map(glider_track = glider_trk, dtc = clean_vem_detections_geo, 
-                pth = "docs/index.html", recs = recs),
+                pth = "docs/index.html", recs = recs, v_pth = vps),
     format = "file"
   ),
 

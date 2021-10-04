@@ -158,12 +158,12 @@ leaflet_map <- function(glider_track = glider_trk,
                         recs = "data/receiver_coords.fst",
                         pth, v_pth = vps){
   
-  v_pth <- "data/vps/synthetic.positions/all.csv"
+  #v_pth <- "data/vps/synthetic.positions/all.csv"
   vps <- data.table::fread(v_pth)
   set(vps, j = "Time", value = fasttime::fastPOSIXct(vps$Time))
   vps <- vps[FullId %in% c("A69-1604-32403"),]
 
-  color_pal <- colorBin(palette = "viridis", domain = c(0,5), bins = 100)
+  color_pal <- colorNumeric(palette = "magma", domain = vps$HPEs, reverse = TRUE)
   
   recs <- fst::read_fst(recs)
   MBU1_180 <- dtc[receiver_site == "mary_lou" & receiver_freq == 180 & transmitter_site == "MBU-001",]
@@ -211,7 +211,7 @@ leaflet_map <- function(glider_track = glider_trk,
 
   #vps
   m <- addPolylines(map = m, data = vps, lng = ~Longitude, lat = ~Latitude, color = "purple", group = "vps")
-  m <- addCircleMarkers(m, data = vps, lng = ~Longitude, lat = ~Latitude, color = ~color_pal, radius = 10, stroke = FALSE, fillOpacity = 1, group = "vps")
+  m <- addCircleMarkers(m, data = vps, lng = ~Longitude, lat = ~Latitude, color = ~color_pal(HPEs), radius = 10, stroke = FALSE, fillOpacity = 1, group = "vps")
   
   #  m <- addMarkers(m, lng = -83.58845, lat = 44.08570, label = "release")
   m <- addCircleMarkers(m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green", radius = 5, stroke = FALSE, fillOpacity = 1)
@@ -240,7 +240,9 @@ leaflet_map <- function(glider_track = glider_trk,
   m <- leafem::addMouseCoordinates(m)
   m <- addMeasure(m, primaryLengthUnit = "meters", secondaryLengthUnit = "kilometers")  
   m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("Tag-180deep", "Tag-180shallow", "Tag-69deep", "Tag-69shallow", "self-dtc,180", "self-dtc,69", "vps"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
+  #m <- addLegend( map = m, pal = color_pal, values = ~HPEs, title = "HPE", opacity=1)
 
+  
   htmlwidgets::saveWidget(m, pth)
   return(pth)
 }
