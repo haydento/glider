@@ -59,7 +59,7 @@ list(
 
   tar_target(
     instr_deploy_data,
-    list.files("data/instr_deploy_log", full.names = TRUE, pattern = "\\.csv$"),
+    "data/instr_deploy_log/gear_deployment_log.csv",
     format = "file"
   ),  
 
@@ -102,6 +102,12 @@ list(
     format = "fst_dt"
   ),
 
+  tar_target(
+    dtc_geo,
+    stationary_recs_geo(vrl = dtc, hst_l = instr_deploy_data),
+    format = "fst_dt"
+  ),
+  
   tar_target(
     vps,
     "data/vps/synthetic.positions/all.csv",
