@@ -43,41 +43,58 @@ extract_vrl <- function(in_pth, out_dir, vdat_pth){
 #' 
 #' @examples
 #' fls <- list.files("~/Documents/glider_range_test_results_2021/data/vdat_csv", full.names = TRUE)
+#' compile_dtc(fls)
 
-#' compile_det(pth = pth)
+
 compile_dtc <- function(fls){
   name_col <- names(fread(cmd = paste("grep -iw DET_DESC", fls[1])))
   int_trans <- paste("grep -iw", "DET", fls)
   trans <- lapply(int_trans, function(x) fread(cmd = x))
   trans <- rbindlist(trans)
   setnames(trans, paste0("V", 1:length(name_col)), name_col)
-  ## trans[Model == "VR2Tx-69", frequency := 69]
-  ## trans[Model == "VR2W-180", frequency := 180]
-  ## set(trans, j = "sequence", value =1)
-  ## set(trans, j = "channel", value = 0)
-  ## set(trans, j = "transmitter_code_space", value = "todo")
-  ## set(trans, j = "datetime", value = fasttime::fastPOSIXct(trans$Time, tz = "UTC"))
-  ## setnames(trans, c("Serial Number", "ID", "Sensor Value", "Signal Strength (dB)", "Noise (dB)"), c("serial_no", "transmitter_id", "sensor_value_adc", "signal_level_db", "noise_level_db"))
-  ## trans <- trans[, c("serial_number", "sequence", "datetime", "transmitter_code_space", "transmitter_id", "source_file", "sensor_value_adc", "signal_level_db", "noise_level_db", "channel", "frequency")]
-
-  
-
-  
-  
-  ## set(trans, j = "run_id", value = 1)
-  ## set(trans, j = "run", value = 1)
-  ## set(trans, j = "instr", value = "tag")
-  ## set(trans, j = "mooring_type", value = "stationary")
-  ## trans[, source_file := "todo"]
-  ## trans <- trans[, c("Time", "Serial Number", "channel", "frequency",  "source_file", "Noise (dB)")]
-  ## setnames(trans, names(trans), c("datetime", "serial_no", "channel", "frequency", "source_file", "noise_level_db"))
-  
-
-
-
-  
+  trans[, frequency := as.numeric(gsub("(.*)-", "", Model))]
+  set(trans, j = "datetime", value = fasttime::fastPOSIXct(trans$Time, tz = "UTC"))
+  setnames(trans, c("Serial Number", "ID", "Sensor Value", "Signal Strength (dB)", "Noise (dB)"), c("serial_no", "transmitter_id", "sensor_value_adc", "signal_level_db", "noise_level_db"))
+  set(trans, j = "serial_no", value = as.character(trans$serial_no))
   return(trans)
 }
+
+#' @title adds geographic coordinates to detections
+#' @description joins instrument data with detections
+#' @param vrl compiled detections from multiple vrl files
+#' @param hst_l gear deployment log
+#' @examples
+#' tar_load(instr_deploy_data)
+#' tar_load(dtc)
+#' vrl <- dtc
+#' hst_l <- instr_deploy_data
+#' stationary_recs_geo(vrl = vrl, hst_l = hst_l)
+
+stationary_recs_geo <- function(vrl, hst_l){
+  
+  hst_file <- hst_l[[1]]
+  if(length(hst_l) > 1) stop("Can only load one hst file. Need to expand.")
+  hst_l <- data.table::fread(hst_file)
+
+  #set all missing timestamps to now for convenience
+  if(!inherits(hst_l$timestamp_end_utc, "POSIXct")) {
+    hst_l[ , timestamp_end_utc := as.POSIXct(timestamp_end_utc)]
+    hst_l[is.na(timestamp_end_utc), timestamp_end_utc := Sys.time()]
+    attributes(hst_l$timestamp_end_utc)$tzone <- "UTC"
+  }
+
+  ## deep copy
+  dtc <- data.table::as.data.table(vrl)
+  hst <- data.table::as.data.table(hst_l)
+  
+  dtc <- dtc[hst, ':='(latitude = latitude, longitude = longitude), on = .(Time >= timestamp_start_utc, Time <= timestamp_end_utc,  serial_no == instr_id)]
+
+  # todo... rename columns to make this file look like .vem data, append this data to .vem and then run through "big joins" functions.
+  
+  return(dtc[])
+}
+
+
 
 
 #' @title utility function to convert lat/lon in sci and mission data to decimal degrees
