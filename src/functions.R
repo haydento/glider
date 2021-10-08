@@ -86,13 +86,20 @@ stationary_recs_geo <- function(vrl, hst_l){
   ## deep copy
   dtc <- data.table::as.data.table(vrl)
   hst <- data.table::as.data.table(hst_l)
-  
-  dtc <- dtc[hst, ':='(latitude = latitude, longitude = longitude), on = .(Time >= timestamp_start_utc, Time <= timestamp_end_utc,  serial_no == instr_id)]
 
-  # todo... rename columns to make this file look like .vem data, append this data to .vem and then run through "big joins" functions.
+  dtc <- dtc[hst, ':='(lat_dd = latitude, lon_dd = longitude), on = .(Time >= timestamp_start_utc, Time <= timestamp_end_utc,  serial_no == instr_id)]
+
+  # extract out code space
+  dtc[, transmitter_code_space := gsub("^([^-]*-[^-]*)-.*$", "\\1", `Full ID`)]
+
+  dtc <- dtc[, c("datetime", "Model", "serial_no", "transmitter_id", "signal_level_db", "noise_level_db", "sensor_value_adc", "Sensor Unit", "frequency", "lat_dd", "lon_dd")]
+  
   
   return(dtc[])
 }
+
+
+# now need to cbind(dtc_geo, clean_vem_detections, fill = TRUE)
 
 
 
