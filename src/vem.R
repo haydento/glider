@@ -197,8 +197,8 @@ infer_detection_locations <- function(dtc, pos){
 #' @param hst instrument history log (tag and reciever metadata)
 #' 
 #' @examples
-#' targets::tar_load("clean_vem_detections")
-#' dta <- clean_vem_detections
+#' targets::tar_load("vrl_vem_combined")
+#' dta <- vrl_vem_combined
 #' 
 #' targets::tar_load("instr_deploy_data")
 #' hst_l <- instr_deploy_data
@@ -234,7 +234,7 @@ get_instr_data <- function(dta, hst_l){
                                                   tag_col_names))    
   
   # combine code space and id to match hst
-  dtc[ , transmitter_instr_id := paste0(transmitter_code_space, "-",
+  dtc[, transmitter_instr_id := paste0(transmitter_code_space, "-",
                                         transmitter_id),
        by = c("transmitter_code_space", "transmitter_id")]
   
