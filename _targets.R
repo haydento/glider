@@ -41,39 +41,48 @@ list(
   tar_target(
     vem_data,
     "data/vem",
-#    list.files("data/vem", full.names = TRUE),
     format = "file"
   ),
   
   tar_target(
-    clean_vem_status,
+    clean_vem_status, #operating info from receivers
     read_vem(vem_data)$status,
     format = "fst_dt"
   ),
   
   tar_target(
-    clean_vem_detections,
+    clean_vem_detections, #glider detections
     infer_detection_locations(read_vem(vem_data)$detections, glider_trk),
     format = "fst_dt"
   ),
 
+  tar_target(
+    vrl_vem_combined,
+    rbind(dtc_geo, clean_vem_detections, fill = TRUE),
+    format = "fst_dt"
+    ),
+  
   tar_target(
     instr_deploy_data,
     "data/instr_deploy_log/gear_deployment_log.csv",
     format = "file"
   ),  
 
-  # just detections with receiver-tag distances calculated and tag/receiver info added
+  # detections from vrl and vem combined
+  # "big joins"- joins receiver and tag location information with detection
   tar_target( 
-    clean_vem_detections_geo,
-    get_instr_data(clean_vem_detections, instr_deploy_data),
+    vrl_vem_combined_dtc,
+    get_instr_data(dta = vrl_vem_combined, hst_l = instr_deploy_data),
     format = "fst_dt"
   ),
+
+
+
 
   
   tar_target(
     glider_leaflet,
-    leaflet_map(glider_track = glider_trk, dtc = clean_vem_detections_geo, 
+    leaflet_map(glider_track = glider_trk, dtc = vrl_vem_combined_dtc, 
                 pth = "docs/index.html", recs = recs, v_pth = vps),
     format = "file"
   ),
@@ -113,6 +122,8 @@ list(
     "data/vps/synthetic.positions/all.csv",
     format = "file"
   )
+
+ 
 
     
   

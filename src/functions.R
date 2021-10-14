@@ -54,10 +54,15 @@ compile_dtc <- function(fls){
   setnames(trans, paste0("V", 1:length(name_col)), name_col)
   trans[, frequency := as.numeric(gsub("(.*)-", "", Model))]
   set(trans, j = "datetime", value = fasttime::fastPOSIXct(trans$Time, tz = "UTC"))
+  set(trans, j = "transmitter_code_space", value = gsub("^([^-]*-[^-]*)-.*$", "\\1", trans$`Full ID`))
   setnames(trans, c("Serial Number", "ID", "Sensor Value", "Signal Strength (dB)", "Noise (dB)"), c("serial_no", "transmitter_id", "sensor_value_adc", "signal_level_db", "noise_level_db"))
   set(trans, j = "serial_no", value = as.character(trans$serial_no))
   return(trans)
 }
+
+
+
+
 
 #' @title adds geographic coordinates to detections
 #' @description joins instrument data with detections
@@ -87,22 +92,16 @@ stationary_recs_geo <- function(vrl, hst_l){
   dtc <- data.table::as.data.table(vrl)
   hst <- data.table::as.data.table(hst_l)
 
+  # add latitude and longitude
   dtc <- dtc[hst, ':='(lat_dd = latitude, lon_dd = longitude), on = .(Time >= timestamp_start_utc, Time <= timestamp_end_utc,  serial_no == instr_id)]
 
   # extract out code space
-  dtc[, transmitter_code_space := gsub("^([^-]*-[^-]*)-.*$", "\\1", `Full ID`)]
-
-  dtc <- dtc[, c("datetime", "Model", "serial_no", "transmitter_id", "signal_level_db", "noise_level_db", "sensor_value_adc", "Sensor Unit", "frequency", "lat_dd", "lon_dd")]
+#  dtc[, transmitter_code_space := gsub("^([^-]*-[^-]*)-.*$", "\\1", `Full ID`)]
+  dtc <- dtc[, c("datetime", "Model", "serial_no", "transmitter_id", "signal_level_db", "noise_level_db", "sensor_value_adc", "Sensor Unit", "frequency", "lat_dd", "lon_dd", "transmitter_code_space")]
   
   
   return(dtc[])
 }
-
-
-# now need to cbind(dtc_geo, clean_vem_detections, fill = TRUE)
-
-
-
 
 #' @title utility function to convert lat/lon in sci and mission data to decimal degrees
 #' @param x vector of lat or lons, either science or mission data with lat and lon
@@ -174,11 +173,19 @@ combine <- function(x,y){
 #' @param glider_track combined data.table containing surface points of glider
 #' @param pth output file path (character)
 #' @examples
-#' tar_load(glider_trk) 
+#' tar_load("glider_trk")
+#' tar_load("vrl_vem_combined_dtc")
+#' tar_load("vps")
+#' glider_track = glider_trk
+#' dtc = vrl_vem_combined_dtc
+#' recs = "data/receiver_coords.fst"
+#' pth = "docs/index.html"
+#' v_pth = vps
+#'
 #' leaflet_map(glider_track = glider_trk, pth = "output/test.html", recs = "data/receiver_coords.fst")
 
 leaflet_map <- function(glider_track = glider_trk, 
-                        dtc = clean_vem_detections_geo,
+                        dtc = vrl_vem_combined_dtc,
                         recs = "data/receiver_coords.fst",
                         pth, v_pth = vps){
   
@@ -277,7 +284,18 @@ leaflet_map <- function(glider_track = glider_trk,
   
  
 
+# junk below...
+#########################
 
 
-  
-  
+## tar_load("vrl_vem_combined_dtc")
+## dtc <- vrl_vem_combined_dtc
+
+## dtc[receiver_site == "MBU-001" & transmitter_instr_id %in% c("A69-1604-32405", "A69-1604-32406"),]
+## dtc[transmitter_instr_id %in% c("A69-1604-32405", "A69-1604-32406"),]
+## foo <- dtc[receiver_site == "mary_lou" & transmitter_instr_id %in% c("A69-1604-32405", "A69-1604-32406")]
+## unique(foo$transmitter_instr_id)
+## setkey(dtc, datetime)
+## foo <- diff(dtc$datetime)
+## hist(as.numeric(foo))
+## range(foo)
