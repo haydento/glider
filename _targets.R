@@ -9,13 +9,13 @@ list(
   tar_target(
     sci_data,
     #    list.files("data/glider_decimated/science", full.names = TRUE),
-    "data/glider_decimated/science",
+    "data/glider_decimated/science/SB_trial",
     format = "file"
   ),
 
   tar_target(
     mission_data,
-    "data/glider_decimated/mission",
+    "data/glider_decimated/mission/SB_trial",
     #list.files("data/glider_decimated/mission", full.names = TRUE),
     format = "file"
   ),
@@ -40,12 +40,12 @@ list(
   
   tar_target(
     vem_data,
-    "data/vem",
+    "data/vem/SB_trial",
     format = "file"
   ),
   
   tar_target(
-    clean_vem_status, #operating info from receivers
+    clean_vem_status, #operating info from glider receivers
     read_vem(vem_data)$status,
     format = "fst_dt"
   ),
@@ -80,7 +80,7 @@ list(
   tar_target(
     glider_leaflet,
     leaflet_map(glider_track = glider_trk, dtc = vrl_vem_combined_dtc, 
-                pth = "docs/index.html", recs = recs, v_pth = vps),
+                pth = "docs/index.html", log = hst),
     format = "file"
   ),
 
@@ -114,11 +114,11 @@ list(
     format = "fst_dt"
   ),
   
-  tar_target(
-    vps,
-    "data/vps/synthetic.positions/all.csv",
-    format = "file"
-  ),
+  ## tar_target(
+  ##   vps,
+  ##   "data/vps/synthetic.positions/all.csv",
+  ##   format = "file"
+  ## ),
 
   tar_target(
     hst,

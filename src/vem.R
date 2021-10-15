@@ -207,14 +207,16 @@ get_instr_data <- function(dta, hst_l){
   
   hst_file <- hst_l[[1]]
   if(length(hst_l) > 1) stop("Can only load one hst file. Need to expand.")
-  hst_l <- data.table::fread(hst_file)  
-  
+  hst_l <- data.table::fread(hst_file)
+
   #set all missing timestamps to now for convenience
-  if(!inherits(hst_l$timestamp_end_utc, "POSIXct")) {
+ 
     hst_l[ , timestamp_end_utc := as.POSIXct(timestamp_end_utc)]
     hst_l[is.na(timestamp_end_utc), timestamp_end_utc := Sys.time()]
     attributes(hst_l$timestamp_end_utc)$tzone <- "UTC"
-  }
+
+  hst_l <- hst_l[run_id == 2,]
+
   
   #deep copy
   dtc <- data.table::as.data.table(dta)
