@@ -51,7 +51,7 @@ list(
   ),
   
   tar_target(
-    clean_vem_detections, #glider detections
+    clean_vem_detections, #all glider detections
     infer_detection_locations(read_vem(vem_data)$detections, glider_trk),
     format = "fst_dt"
   ),
@@ -75,9 +75,6 @@ list(
     get_instr_data(dta = vrl_vem_combined, hst_l = instr_deploy_data),
     format = "fst_dt"
   ),
-
-
-
 
   
   tar_target(
@@ -121,14 +118,14 @@ list(
     vps,
     "data/vps/synthetic.positions/all.csv",
     format = "file"
+  ),
+
+  tar_target(
+    hst,
+    data.table::fread(instr_deploy_data),
+    format = "fst_dt"
   )
-
- 
-
-    
   
-    
- 
 )
 
 
