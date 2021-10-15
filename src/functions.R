@@ -131,29 +131,32 @@ to_dd <- function(x){
 #'       lat = m_gps_lat, lon = m_gps_lon)
 #'
 #' #multiple files
-#' pth_files <- list.files("data/glider_decimated/mission", full.names = TRUE)
-#' clean(pth_files[1:2], lat = m_gps_lat, lon = m_gps_lon)
+#' tar_load("mission_data")
+#' pth = mission_data
+#' tst <- clean(pth = mission_data, lat = m_gps_lat, lon = m_gps_lon)
 
 
 clean <- function(pth, lat = m_pth_lat, lon = m_gps_lon){
   pth_files <- list.files(pth, full.names = TRUE)
-  out <- .clean(pth_files, lat = lat, lon = lon)
+  out <- .clean(pth = pth_files, lat = lat, lon = lon)
 return(out)
 }
 
 .clean <- function(pth, lat = m_gps_lat, lon = m_gps_lon){
 
-  header <- data.table::fread(pth[1], nrows = 0)
-  dta_list <- lapply(pth, data.table::fread, skip = 2, na.strings = "NaN")
-  dta <- data.table::rbindlist(dta_list)
-  data.table::setnames(dta, names(dta), names(header))
+  # bring in all files and drop the second row
+  dta <- lapply(pth, function(x){data.table::fread(x, na.strings = "NaN")[-1]})
+  dta <- data.table::rbindlist(dta, fill = TRUE)
+
+  # convert all columns from character to numeric
+  dta[, names(dta) := lapply(.SD, as.numeric)]
   data.table::set(dta, j="time", 
                   value = as.POSIXct(dta$time, 
                                      origin = "1970-01-01 00:00:00", 
                                      tz = "UTC"))
   dta[, lat_dd := to_dd(m_gps_lat)]
   dta[, lon_dd := to_dd(m_gps_lon)]
-  return(dta)
+  return(dta[])
 
 }
 
@@ -279,14 +282,54 @@ leaflet_map <- function(glider_track = glider_trk,
 }
 
 
+###########################
+#' spatial events function
+#' tar_load("glider_trk")
+#' tar_load("hst")
+#' # pull out stationary receivers (69 khz at MBU-001)
+#'  hst_lat <- hst[site == "MBU-001"][[ c("latitude")]][[1]]
+#'  hst_lon <- hst[site == "MBU-001"][["longitude"]][[1]]
+#' spatial_events(track = glider_trk, rec_lat = hst_lat, rec_lon = hst_lon, dist_thresh = 1000)
 
+spatial_events <- function(track = glider_trk, rec_lat = hst_lat, rec_lon = hst_lon, dist_thresh = 1000){ 
 
+  trk <- data.table::copy(track)
   
- 
+  trk <- trk[!(is.na(lon_dd) | is.na(lat_dd)),]
+  setkey(trk, time)
+
+  trk[, GT_dist := geosphere::distGeo(c(rec_lon, rec_lat), cbind(lon_dd, lat_dd))]
+
+  trk[, lag_dist := shift(GT_dist, type = "lag")]
+  trk[, lead_dist := shift(GT_dist, type = "lead")]
+  trk[, arrive := 0]
+  trk[, depart := 0]
+  trk[GT_dist < dist_thresh & lag_dist > dist_thresh, arrive := 1]
+  trk[GT_dist < dist_thresh & lead_dist > dist_thresh, depart := 1]
+  trk[GT_dist < dist_thresh & is.na(lag_dist), arrive := 1]
+  trk[GT_dist < dist_thresh & is.na(lead_dist), depart := 1]
+  trk[, event := cumsum(arrive), ]
+
+  return(trk)
+}
+
+
 
 # junk below...
 #########################
 
+## x <- data.table(dist = c(500,500,1000,500,250,2000,500,2000,500,5000,5000,500))
+##   trk[, lag_dist := shift(dist, type = "lag")]
+##   x[, lead_dist := shift(dist, type = "lead")]
+##   x[, arrive := 0]
+##   x[, depart := 0]
+##   x[dist < 1000 & lag_dist > 1000, arrive := 1]
+##   x[dist < 1000 & lead_dist >1000, depart := 1]
+##   x[dist < 1000 & is.na(lag_dist), arrive := 1]
+##   x[dist < 1000 & is.na(lead_dist), depart := 1]
+##   x[, event := cumsum(arrive), ]
+
+  
 
 ## tar_load("vrl_vem_combined_dtc")
 ## dtc <- vrl_vem_combined_dtc
