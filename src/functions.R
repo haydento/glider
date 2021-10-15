@@ -81,6 +81,8 @@ stationary_recs_geo <- function(vrl, hst_l){
   if(length(hst_l) > 1) stop("Can only load one hst file. Need to expand.")
   hst_l <- data.table::fread(hst_file)
 
+  hst_l <- hst_l[run_id == 2,]
+  
   #set all missing timestamps to now for convenience
   if(!inherits(hst_l$timestamp_end_utc, "POSIXct")) {
     hst_l[ , timestamp_end_utc := as.POSIXct(timestamp_end_utc)]
@@ -131,7 +133,7 @@ to_dd <- function(x){
 #'       lat = m_gps_lat, lon = m_gps_lon)
 #'
 #' #multiple files
-#' tar_load("mission_data")
+#' tar_load("sci_data")
 #' pth = mission_data
 #' tst <- clean(pth = mission_data, lat = m_gps_lat, lon = m_gps_lon)
 
@@ -179,9 +181,10 @@ combine <- function(x,y){
 #' tar_load("glider_trk")
 #' tar_load("vrl_vem_combined_dtc")
 #' tar_load("vps")
+#' tar_load("hst")
 #' glider_track = glider_trk
 #' dtc = vrl_vem_combined_dtc
-#' recs = "data/receiver_coords.fst"
+#' recs = hst
 #' pth = "docs/index.html"
 #' v_pth = vps
 #'
@@ -189,47 +192,47 @@ combine <- function(x,y){
 
 leaflet_map <- function(glider_track = glider_trk, 
                         dtc = vrl_vem_combined_dtc,
-                        recs = "data/receiver_coords.fst",
-                        pth, v_pth = vps){
-  
-  #v_pth <- "data/vps/synthetic.positions/all.csv"
-  vps <- data.table::fread(v_pth)
-  set(vps, j = "Time", value = fasttime::fastPOSIXct(vps$Time))
-  vps <- vps[FullId %in% c("A69-1604-32403"),]
+                        pth = "docx/index.html", log = hst){
 
-  color_pal <- colorNumeric(palette = "magma", domain = vps$HPEs, reverse = TRUE)
-  
-  recs <- fst::read_fst(recs)
-  MBU1_180 <- dtc[receiver_site == "mary_lou" & receiver_freq == 180 & transmitter_site == "MBU-001",]
+  #v_pth <- "data/vps/synthetic.positions/all.csv"
+#  vps <- data.table::fread(v_pth)
+#  set(vps, j = "Time", value = fasttime::fastPOSIXct(vps$Time))
+#  vps <- vps[FullId %in% c("A69-1604-32403"),]
+#  color_pal <- colorNumeric(palette = "magma", domain = vps$HPEs, reverse = TRUE)
+
+  recs <- log[run_id == 2 & instr == "receiver" & mooring_type == "stationary"]
+  recs <- unique(recs, by = c("latitude", "longitude"))
+
+  MBU1_180 <- dtc[receiver_site == "cormorant" & receiver_freq == 180 & transmitter_site == "MBU-001",]
   MBU1_180_dtc_ct <- nrow(MBU1_180)
 
-  MBU1_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
-  MBU1_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_180_dtc_ct)]
+ MBU1_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+ MBU1_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_180_dtc_ct)]
 
-  MBU2_180 <- dtc[receiver_site == "mary_lou" & receiver_freq == 180 & transmitter_site == "MBU-002",]
+  MBU2_180 <- dtc[receiver_site == "cormorant" & receiver_freq == 180 & transmitter_site == "MBU-002",]
   MBU2_180_dtc_ct <- nrow(MBU2_180)
   
   MBU2_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
   MBU2_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_180_dtc_ct)]
 
   ##################
-  MBU1_69 <- dtc[receiver_site == "mary_lou" & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & transmitter_site == "MBU-001" ,]
+  MBU1_69 <- dtc[receiver_site == "cormorant" & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & transmitter_site == "MBU-001" ,]
   MBU1_69_dtc_ct <- nrow(MBU1_69)
 
-  MBU1_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
-  MBU1_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_69_dtc_ct)]
+  #MBU1_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  #MBU1_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_69_dtc_ct)]
 
-  MBU2_69 <- dtc[receiver_site == "mary_lou" & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & receiver_freq == 69 & transmitter_site == "MBU-002",]
-  MBU2_69_dtc_ct <- nrow(MBU2_69)
+  #MBU2_69 <- dtc[receiver_site == "mary_lou" & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & receiver_freq == 69 & transmitter_site == "MBU-002",]
+  #MBU2_69_dtc_ct <- nrow(MBU2_69)
   
-  MBU2_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
-  MBU2_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_69_dtc_ct)]
+  #MBU2_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  #MBU2_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_69_dtc_ct)]
 
   ################
-  self_dtc_180 <- dtc[receiver_site == "mary_lou" & transmitter_site == "mary_lou" & receiver_freq == 180,]
-  self_dtc_180[, label := sprintf("180kHz, ML depth (m): %.1f; dtc date: %s", glider_m_depth, format(datetime, "%Y-%m-%d %H:%M"))]
-  self_dtc_69 <- dtc[receiver_site == "mary_lou" & transmitter_site == "mary_lou" & receiver_freq == 69,]
-  self_dtc_69[, label := sprintf("69kHz, ML depth (m): %.1f; dtc date: %s", glider_m_depth, format(datetime, "%Y-%m-%d %H:%M"))]
+  self_dtc_180 <- dtc[receiver_site == "cormorant" & transmitter_site == "cormorant" & receiver_freq == 180,]
+  self_dtc_180[, label := sprintf("180kHz, CO depth (m): %.1f; dtc date: %s", glider_m_depth, format(datetime, "%Y-%m-%d %H:%M"))]
+  self_dtc_69 <- dtc[receiver_site == "cormorant" & transmitter_site == "cormorant" & receiver_freq == 69,]
+  self_dtc_69[, label := sprintf("69kHz, CO depth (m): %.1f; dtc date: %s", glider_m_depth, format(datetime, "%Y-%m-%d %H:%M"))]
   
 
   m <- leaflet()
@@ -244,28 +247,29 @@ leaflet_map <- function(glider_track = glider_trk,
   m <- addPolylines(map = m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green")
 
   #vps
-  m <- addPolylines(map = m, data = vps, lng = ~Longitude, lat = ~Latitude, color = "purple", group = "vps")
-  m <- addCircleMarkers(m, data = vps, lng = ~Longitude, lat = ~Latitude, color = ~color_pal(HPEs), radius = 10, stroke = FALSE, fillOpacity = 1, group = "vps")
+  ## m <- addPolylines(map = m, data = vps, lng = ~Longitude, lat = ~Latitude, color = "purple", group = "vps")
+  ## m <- addCircleMarkers(m, data = vps, lng = ~Longitude, lat = ~Latitude, color = ~color_pal(HPEs), radius = 10, stroke = FALSE, fillOpacity = 1, group = "vps")
   
   #  m <- addMarkers(m, lng = -83.58845, lat = 44.08570, label = "release")
-  m <- addCircleMarkers(m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green", radius = 5, stroke = FALSE, fillOpacity = 1)
-  m <- addCircleMarkers(m, data = recs, lng = ~lon, lat = ~lat, color = "blue", radius = 8, stroke = FALSE, fillOpacity = 1)
+  ## m <- addCircleMarkers(m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green", radius = 5, stroke = FALSE, fillOpacity = 1)
 
-  #add MBU-001-180 receiver and detections
-  m <- addCircleMarkers(map = m, data = MBU1_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180deep", label = ~receiver_label)
-  
-  m <- addCircleMarkers(map = m, data = MBU1_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180deep", label = ~tag_label)
-  #add MBU-002-180 receiver and detections
-  m <- addCircleMarkers(map = m, data = MBU2_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180shallow", label = ~receiver_label)
-  m <- addCircleMarkers(map = m, data = MBU2_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180shallow", label = ~tag_label)
+  m <- addCircleMarkers(m, data = recs, lng = ~longitude, lat = ~latitude, color = "blue", radius = 8, stroke = FALSE, fillOpacity = 1)
 
-  # add MBU-001-69 detections
-    m <- addCircleMarkers(map = m, data = MBU1_69, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69deep", label = ~receiver_label)
+##   #add MBU-001-180 receiver and detections
+##   m <- addCircleMarkers(map = m, data = MBU1_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180-MBU1", label = ~receiver_label)
+
+## m <- addCircleMarkers(map = m, data = MBU1_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180-MBU1", label = ~tag_label)
+##   #add MBU-002-180 receiver and detections
+##   m <- addCircleMarkers(map = m, data = MBU2_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180-MBU2", label = ~receiver_label)
+##   m <- addCircleMarkers(map = m, data = MBU2_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180-MBU2", label = ~tag_label)
+
+##   # add MBU-001-69 detections
+##     m <- addCircleMarkers(map = m, data = MBU1_69, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69-MBU1", label = ~receiver_label)
   
-  m <- addCircleMarkers(map = m, data = MBU1_69, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69deep", label = ~tag_label)
-  #add MBU-002-180 receiver and detections
-  m <- addCircleMarkers(map = m, data = MBU2_69, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69shallow", label = ~receiver_label)
-  m <- addCircleMarkers(map = m, data = MBU2_69, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69shallow", label = ~tag_label)
+##   m <- addCircleMarkers(map = m, data = MBU1_69, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69-MBU1", label = ~tag_label)
+##   #add MBU-002-180 receiver and detections
+##   m <- addCircleMarkers(map = m, data = MBU2_69, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69-MBU2", label = ~receiver_label)
+##   m <- addCircleMarkers(map = m, data = MBU2_69, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69-MBU2", label = ~tag_label)
 
   # self dtc-180
   m <- addCircleMarkers(map = m, data = self_dtc_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, colo = "orange", radius = 9, stroke = FALSE, fillOpacity = 1, group = "self-dtc,180", label = ~label)
@@ -273,7 +277,9 @@ leaflet_map <- function(glider_track = glider_trk,
   
   m <- leafem::addMouseCoordinates(m)
   m <- addMeasure(m, primaryLengthUnit = "meters", secondaryLengthUnit = "kilometers")  
-  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("Tag-180deep", "Tag-180shallow", "Tag-69deep", "Tag-69shallow", "self-dtc,180", "self-dtc,69", "vps"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
+  #  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("Tag-180-MBU1", "Tag-180-MBU2", "Tag-69-MBU1", "Tag-69-MBU2", "self-dtc,180", "self-dtc,69", "vps"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
+  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("self-dtc,180", "self-dtc,69"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
+
   #m <- addLegend( map = m, pal = color_pal, values = ~HPEs, title = "HPE", opacity=1)
 
   
