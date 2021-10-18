@@ -9,13 +9,13 @@ list(
   tar_target(
     sci_data,
     #    list.files("data/glider_decimated/science", full.names = TRUE),
-    "data/glider_decimated/science/SB_trial",
+    "data/glider_decimated/science",
     format = "file"
   ),
 
   tar_target(
     mission_data,
-    "data/glider_decimated/mission/SB_trial",
+    "data/glider_decimated/mission",
     #list.files("data/glider_decimated/mission", full.names = TRUE),
     format = "file"
   ),
@@ -34,13 +34,13 @@ list(
 
   tar_target(
     glider_trk,
-    combine(x = clean_mission, y = clean_sci),
+    combine(x = clean_mission, y = clean_sci, id = trial_id),
     format = "fst_dt"
   ),
   
   tar_target(
     vem_data,
-    "data/vem/SB_trial",
+    "data/vem",
     format = "file"
   ),
   
@@ -51,7 +51,7 @@ list(
   ),
   
   tar_target(
-    clean_vem_detections, #all glider detections
+    clean_vem_detections, #all glider detections.  look here for fish detections
     infer_detection_locations(read_vem(vem_data)$detections, glider_trk),
     format = "fst_dt"
   ),
@@ -124,7 +124,23 @@ list(
     hst,
     hst_clean(hst_l = instr_deploy_data),
     format = "fst_dt"
+  ),
+
+  tar_target(
+    glider_trial,
+    "data/range_trial/range_trial_dates.csv",
+    format = "file"
+  ),
+
+  tar_target(
+    trial_id,
+    trial_parser(pth = glider_trial),
+    format = "fst_dt"
   )
+  
+  
+  
+
   
 )
 

@@ -106,6 +106,27 @@ to_dd <- function(x){
 }
 
 
+#' @title get range test trial data
+#' @description range test was conducted over multiple time periods and locations.  This document contains start and end dates and identifiers (start and end datetime are local)
+#' @param pth
+#' @examples
+#' pth <- "data/range_trial/range_trial_dates.csv"
+#' trial_parser(pth)
+
+trial_parser <- function(pth = glider_trial){
+
+  x <- fread(pth)
+  
+  x[ ,timestamp_end_utc := as.POSIXct(timestamp_end_utc)]
+  x[ ,timestamp_start_utc := as.POSIXct(timestamp_start_utc)]
+  
+  x[is.na(timestamp_end_utc), timestamp_end_utc := Sys.time()]
+  attributes(x$timestamp_end_utc)$tzone <- "UTC"
+  attributes(x$timestamp_start_utc)$tzone <- "UTC"
+  return(x)
+}
+
+
 #' @title cleans up and formats science and mission data files
 #' @description removes 2nd line of header, sets time column to POSIX, and convert lat/lon to decimal degrees
 #' @param pth file path to mission or science data offload
@@ -119,17 +140,20 @@ to_dd <- function(x){
 #'
 #' #multiple files
 #' tar_load("sci_data")
-#' pth = mission_data
+#' pth_files = sci_data
+#' tar_load("hst")
+#' trial = hst
+#' 
 #' tst <- clean(pth = mission_data, lat = m_gps_lat, lon = m_gps_lon)
 
 
-clean <- function(pth, lat = m_pth_lat, lon = m_gps_lon){
+clean <- function(pth, lat = m_pth_lat, lon = m_gps_lon, trial = hst){
   pth_files <- list.files(pth, full.names = TRUE)
   out <- .clean(pth = pth_files, lat = lat, lon = lon)
-return(out)
+  return(out)
 }
 
-.clean <- function(pth, lat = m_gps_lat, lon = m_gps_lon){
+.clean <- function(pth = pth_files, lat = m_gps_lat, lon = m_gps_lon){
 
   # bring in all files and drop the second row
   dta <- lapply(pth, function(x){data.table::fread(x, na.strings = "NaN")[-1]})
@@ -143,6 +167,7 @@ return(out)
                                      tz = "UTC"))
   dta[, lat_dd := to_dd(m_gps_lat)]
   dta[, lon_dd := to_dd(m_gps_lon)]
+  
   return(dta[])
 
 }
@@ -151,11 +176,24 @@ return(out)
 #' @description function combines mission and science data into single data.table.  Also removes any records without both latitude and longitude
 #' @param x science data
 #' @param y mission data
+#' @examples
+#' tar_load(clean_mission)
+#' tar_load(clean_sci)
+#' tar_load(trial_id)
+#' x <- clean_mission
+#' y <- clean_sci
+#' id <- trial_id
 
-combine <- function(x,y){  
+combine <- function(x,y,id){  
   out <- rbind(x, y, fill = TRUE)
   out <- unique(out)
   setkey(out, time)
+
+  out[id, ':=' (run_id = run_id, run = run), on = .(time >= timestamp_start_utc, time <= timestamp_end_utc)]
+  #out[id, ':=' (run_id = run_id), on = .(time >= timestamp_start_utc, time <= timestamp_end_utc)]
+  
+  
+  return(out)
 }
 
 #' @title creates interactive map of glider track
@@ -185,41 +223,53 @@ leaflet_map <- function(glider_track = glider_trk,
 #  vps <- vps[FullId %in% c("A69-1604-32403"),]
 #  color_pal <- colorNumeric(palette = "magma", domain = vps$HPEs, reverse = TRUE)
 
-  recs <- log[run_id == 2 & instr == "receiver" & mooring_type == "stationary"]
-  recs <- unique(recs, by = c("latitude", "longitude"))
+  # HB receivers
+  recs_HB <- log[instr == "receiver" & mooring_type == "stationary" & run == 1]
+  recs_HB <- unique(recs_HB, by = c("latitude", "longitude"))
+  # SB receivers
+  recs_SB <- log[instr == "receiver" & mooring_type == "stationary" & run == 2]
+  recs_SB <- unique(recs_SB, by = c("latitude", "longitude"))
 
-  MBU1_180 <- dtc[receiver_site == "cormorant" & receiver_freq == 180 & transmitter_site == "MBU-001",]
+  # HB glider
+  glider_HB <- glider_track[!(is.na(lon_dd) | is.na(lat_dd)) & run_id == 1]
+  # SB glider
+  glider_SB <- glider_track[!(is.na(lon_dd) | is.na(lat_dd)) & run_id == 2]
+
+  
+
+  # detections of MBU_1 tags on glider (180kHz)
+  MBU1_180 <- dtc[(receiver_site == "cormorant" | receiver_site == "mary_lou") & receiver_freq == 180 & transmitter_site == "MBU-001",]
   MBU1_180_dtc_ct <- nrow(MBU1_180)
 
  MBU1_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
  MBU1_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_180_dtc_ct)]
 
-  MBU2_180 <- dtc[receiver_site == "cormorant" & receiver_freq == 180 & transmitter_site == "MBU-002",]
+  # detections of MBU_2 tags on glider (180kHz)
+  MBU2_180 <- dtc[(receiver_site == "cormorant" | receiver_site == "mary_lou") & receiver_freq == 180 & transmitter_site == "MBU-002",]
   MBU2_180_dtc_ct <- nrow(MBU2_180)
   
   MBU2_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
   MBU2_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_180_dtc_ct)]
 
-  ##################
-  MBU1_69 <- dtc[receiver_site == "cormorant" & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & transmitter_site == "MBU-001" ,]
+  # detections of MBU1 tags on glider (69kHz)
+  MBU1_69 <- dtc[(receiver_site == "mary_lou" | receiver_site == "cormorant") & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & transmitter_site == "MBU-001" ,]
   MBU1_69_dtc_ct <- nrow(MBU1_69)
 
-  #MBU1_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
-  #MBU1_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_69_dtc_ct)]
+  MBU1_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  MBU1_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_69_dtc_ct)]
 
-  MBU2_69 <- dtc[receiver_site == "mary_lou" & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & receiver_freq == 69 & transmitter_site == "MBU-002",]
+  MBU2_69 <- dtc[(receiver_site == "mary_lou" | receiver_site == "cormorant") & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & receiver_freq == 69 & transmitter_site == "MBU-002",]
   MBU2_69_dtc_ct <- nrow(MBU2_69)
   
-  #MBU2_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
-  #MBU2_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_69_dtc_ct)]
+  MBU2_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  MBU2_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_69_dtc_ct)]
 
-  ################
-  self_dtc_180 <- dtc[receiver_site == "cormorant" & transmitter_site == "cormorant" & receiver_freq == 180,]
-  self_dtc_180[, label := sprintf("180kHz, CO depth (m): %.1f; dtc date: %s", glider_m_depth, format(datetime, "%Y-%m-%d %H:%M"))]
-  self_dtc_69 <- dtc[receiver_site == "cormorant" & transmitter_site == "cormorant" & receiver_freq == 69,]
-  self_dtc_69[, label := sprintf("69kHz, CO depth (m): %.1f; dtc date: %s", glider_m_depth, format(datetime, "%Y-%m-%d %H:%M"))]
-  
+  # self-detection of mary-lou and cormorant
+  self_dtc_180 <- dtc[receiver_mooring_type == "mobile" & transmitter_mooring_type == "mobile" & receiver_freq == 180,]
+  self_dtc_69 <- dtc[receiver_mooring_type == "mobile" & transmitter_mooring_type == "mobile" & receiver_freq == 69,]
 
+
+  # now build leaflet map
   m <- leaflet()
   m <- setView(m, zoom = 15, lat = 45.537 , lng = -83.999)
   m <- addTiles(m)
@@ -227,9 +277,6 @@ leaflet_map <- function(glider_track = glider_trk,
   m <- addTiles(m, urlTemplate = "http://tileservice.charts.noaa.gov/tiles/50000_1/{z}/{x}/{y}.png", group = "nav chart")
   m <- addProviderTiles(m, providers$Esri.WorldImagery, group = "satellite")
   m <- addProviderTiles(m, providers$Esri.NatGeoWorldMap, group = "alt")
-  #drop missing lat/lon
-  glider_track <- glider_track[!(is.na(lon_dd) | is.na(lat_dd)),]
-  m <- addPolylines(map = m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green")
 
   #vps
   ## m <- addPolylines(map = m, data = vps, lng = ~Longitude, lat = ~Latitude, color = "purple", group = "vps")
@@ -238,9 +285,15 @@ leaflet_map <- function(glider_track = glider_trk,
   #  m <- addMarkers(m, lng = -83.58845, lat = 44.08570, label = "release")
   ## m <- addCircleMarkers(m, data = glider_track, lng = ~lon_dd, lat = ~lat_dd, color = "green", radius = 5, stroke = FALSE, fillOpacity = 1)
 
-  m <- addCircleMarkers(m, data = recs, lng = ~longitude, lat = ~latitude, color = "blue", radius = 8, stroke = FALSE, fillOpacity = 1)
+  # receivers
+  m <- addCircleMarkers(m, data = recs_HB, lng = ~longitude, lat = ~latitude, color = "blue", radius = 8, stroke = FALSE, fillOpacity = 1)
+  m <- addCircleMarkers(m, data = recs_SB, lng = ~longitude, lat = ~latitude, color = "blue", radius = 8, stroke = FALSE, fillOpacity = 1)
 
-##   #add MBU-001-180 receiver and detections
+  # glider track
+  m <- addPolylines(map = m, data = glider_HB, lng = ~lon_dd, lat = ~lat_dd, color = "green")
+  m <- addPolylines(map = m, data = glider_SB, lng = ~lon_dd, lat = ~lat_dd, color = "green")
+
+  #add MBU-001-180 receiver and detections
 ##   m <- addCircleMarkers(map = m, data = MBU1_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180-MBU1", label = ~receiver_label)
 
 ## m <- addCircleMarkers(map = m, data = MBU1_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180-MBU1", label = ~tag_label)
@@ -257,13 +310,13 @@ leaflet_map <- function(glider_track = glider_trk,
 ##   m <- addCircleMarkers(map = m, data = MBU2_69, lng = ~transmitter_longitude, lat = ~transmitter_latitude, color = "red", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-69-MBU2", label = ~tag_label)
 
   # self dtc-180
-  m <- addCircleMarkers(map = m, data = self_dtc_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, colo = "orange", radius = 9, stroke = FALSE, fillOpacity = 1, group = "self-dtc,180", label = ~label)
-  m <- addCircleMarkers(map = m, data = self_dtc_69, lng = ~transmitter_longitude, lat = ~transmitter_latitude, colo = "orange", radius = 9, stroke = FALSE, fillOpacity = 1, group = "self-dtc,69", label = ~label)
+  m <- addCircleMarkers(map = m, data = self_dtc_180, lng = ~transmitter_longitude, lat = ~transmitter_latitude, col = "orange", radius = 9, stroke = FALSE, fillOpacity = 1, group = "self-dtc 180kHz")
+  m <- addCircleMarkers(map = m, data = self_dtc_69, lng = ~transmitter_longitude, lat = ~transmitter_latitude, colo = "orange", radius = 9, stroke = FALSE, fillOpacity = 1, group = "self-dtc 69kHz")
   
   m <- leafem::addMouseCoordinates(m)
   m <- addMeasure(m, primaryLengthUnit = "meters", secondaryLengthUnit = "kilometers")  
   #  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("Tag-180-MBU1", "Tag-180-MBU2", "Tag-69-MBU1", "Tag-69-MBU2", "self-dtc,180", "self-dtc,69", "vps"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
-  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("self-dtc,180", "self-dtc,69"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
+  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("self-dtc 180kHz", "self-dtc 69kHz"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
 
   #m <- addLegend( map = m, pal = color_pal, values = ~HPEs, title = "HPE", opacity=1)
 
@@ -307,7 +360,7 @@ spatial_events <- function(track = glider_trk, rec_lat = hst_lat, rec_lon = hst_
 
 #' @examples
 #' tar_load("instr_deploy_data")
-#' hst <- instr_deploy_data
+#' hst_l <- instr_deploy_data
 #' hst_clean(hst_l = hst)
 
 hst_clean <- function(hst_l){
@@ -319,11 +372,14 @@ hst_clean <- function(hst_l){
   
   #set all missing timestamps to now for convenience
   hst_l[ , timestamp_end_utc := as.POSIXct(timestamp_end_utc)]
+  hst_l[51:60, timestamp_start_utc := as.POSIXct(timestamp_start_utc)]
+  
   hst_l[is.na(timestamp_end_utc), timestamp_end_utc := Sys.time()]
   attributes(hst_l$timestamp_end_utc)$tzone <- "UTC"
+  attributes(hst_l$timestamp_start_utc)$tzone <- "UTC"
 
   # for development...
-  hst_l <- hst_l[run_id == 2,]
+  #hst_l <- hst_l[run_id == 2,]
 
   return(hst_l)
 }
