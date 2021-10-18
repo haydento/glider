@@ -200,24 +200,11 @@ infer_detection_locations <- function(dtc, pos){
 #' targets::tar_load("vrl_vem_combined")
 #' dta <- vrl_vem_combined
 #' 
-#' targets::tar_load("instr_deploy_data")
-#' hst_l <- instr_deploy_data
+#' targets::tar_load("hst")
+#' hst_l <- hst
 
 get_instr_data <- function(dta, hst_l){
-  
-  hst_file <- hst_l[[1]]
-  if(length(hst_l) > 1) stop("Can only load one hst file. Need to expand.")
-  hst_l <- data.table::fread(hst_file)
-
-  #set all missing timestamps to now for convenience
- 
-    hst_l[ , timestamp_end_utc := as.POSIXct(timestamp_end_utc)]
-    hst_l[is.na(timestamp_end_utc), timestamp_end_utc := Sys.time()]
-    attributes(hst_l$timestamp_end_utc)$tzone <- "UTC"
-
-  hst_l <- hst_l[run_id == 2,]
-
-  
+    
   #deep copy
   dtc <- data.table::as.data.table(dta)
   hst <- data.table::as.data.table(hst_l)
@@ -362,7 +349,7 @@ get_instr_data <- function(dta, hst_l){
   
   
   #Update receiver records with relevant from glider
-  dtc2[receiver_site == "mary_lou" & receiver_mooring_type == "mobile",
+  dtc2[receiver_site %in% c("mary_lou", "cormorant") & receiver_mooring_type == "mobile",
        `:=`(receiver_latitude = glider_lat_dd,
             receiver_longitude = glider_lon_dd,
             receiver_water_depth = NA, #!! calc from depth + altitude
@@ -371,7 +358,7 @@ get_instr_data <- function(dta, hst_l){
        )]
  
   #Update transmitter records with relevant from glider
-  dtc2[transmitter_site == "mary_lou" & transmitter_mooring_type == "mobile",
+  dtc2[transmitter_site %in% c("mary_lou", "cormorant") & transmitter_mooring_type == "mobile",
        `:=`(transmitter_latitude = glider_lat_dd,
             transmitter_longitude = glider_lon_dd,
             transmitter_water_depth = NA, #!! calc from depth + altitude
