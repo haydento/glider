@@ -61,35 +61,19 @@ compile_dtc <- function(fls){
 }
 
 
-
-
-
 #' @title adds geographic coordinates to detections
 #' @description joins instrument data with detections
 #' @param vrl compiled detections from multiple vrl files
 #' @param hst_l gear deployment log
 #' @examples
-#' tar_load(instr_deploy_data)
+#' tar_load(hst)
 #' tar_load(dtc)
 #' vrl <- dtc
-#' hst_l <- instr_deploy_data
-#' stationary_recs_geo(vrl = vrl, hst_l = hst_l)
+#' hst_l <- hst
+#' stationary_recs_geo(vrl = vrl, hst_l = hst)
 
 stationary_recs_geo <- function(vrl, hst_l){
   
-  hst_file <- hst_l[[1]]
-  if(length(hst_l) > 1) stop("Can only load one hst file. Need to expand.")
-  hst_l <- data.table::fread(hst_file)
-
-  hst_l <- hst_l[run_id == 2,]
-  
-  #set all missing timestamps to now for convenience
-  if(!inherits(hst_l$timestamp_end_utc, "POSIXct")) {
-    hst_l[ , timestamp_end_utc := as.POSIXct(timestamp_end_utc)]
-    hst_l[is.na(timestamp_end_utc), timestamp_end_utc := Sys.time()]
-    attributes(hst_l$timestamp_end_utc)$tzone <- "UTC"
-  }
-
   ## deep copy
   dtc <- data.table::as.data.table(vrl)
   hst <- data.table::as.data.table(hst_l)
@@ -104,6 +88,7 @@ stationary_recs_geo <- function(vrl, hst_l){
   
   return(dtc[])
 }
+
 
 #' @title utility function to convert lat/lon in sci and mission data to decimal degrees
 #' @param x vector of lat or lons, either science or mission data with lat and lon
@@ -184,7 +169,7 @@ combine <- function(x,y){
 #' tar_load("hst")
 #' glider_track = glider_trk
 #' dtc = vrl_vem_combined_dtc
-#' recs = hst
+#' log = hst
 #' pth = "docs/index.html"
 #' v_pth = vps
 #'
@@ -222,8 +207,8 @@ leaflet_map <- function(glider_track = glider_trk,
   #MBU1_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
   #MBU1_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_69_dtc_ct)]
 
-  #MBU2_69 <- dtc[receiver_site == "mary_lou" & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & receiver_freq == 69 & transmitter_site == "MBU-002",]
-  #MBU2_69_dtc_ct <- nrow(MBU2_69)
+  MBU2_69 <- dtc[receiver_site == "mary_lou" & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & receiver_freq == 69 & transmitter_site == "MBU-002",]
+  MBU2_69_dtc_ct <- nrow(MBU2_69)
   
   #MBU2_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
   #MBU2_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_69_dtc_ct)]
@@ -318,6 +303,47 @@ spatial_events <- function(track = glider_trk, rec_lat = hst_lat, rec_lon = hst_
 
   return(trk)
 }
+
+
+#' @examples
+#' tar_load("instr_deploy_data")
+#' hst <- instr_deploy_data
+#' hst_clean(hst_l = hst)
+
+hst_clean <- function(hst_l){
+
+  hst_file <- hst_l[[1]]
+  if(length(hst_l) > 1) stop("Can only load one hst file. Need to expand.")
+  hst_l <- data.table::fread(hst_file)
+
+  
+  #set all missing timestamps to now for convenience
+  hst_l[ , timestamp_end_utc := as.POSIXct(timestamp_end_utc)]
+  hst_l[is.na(timestamp_end_utc), timestamp_end_utc := Sys.time()]
+  attributes(hst_l$timestamp_end_utc)$tzone <- "UTC"
+
+  # for development...
+  hst_l <- hst_l[run_id == 2,]
+
+  return(hst_l)
+}
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -72,7 +72,7 @@ list(
   # "big joins"- joins receiver and tag location information with detection
   tar_target( 
     vrl_vem_combined_dtc,
-    get_instr_data(dta = vrl_vem_combined, hst_l = instr_deploy_data),
+    get_instr_data(dta = vrl_vem_combined, hst_l = hst),
     format = "fst_dt"
   ),
 
@@ -110,7 +110,7 @@ list(
 
   tar_target(
     dtc_geo,
-    stationary_recs_geo(vrl = dtc, hst_l = instr_deploy_data),
+    stationary_recs_geo(vrl = dtc, hst_l = hst),
     format = "fst_dt"
   ),
   
@@ -122,7 +122,7 @@ list(
 
   tar_target(
     hst,
-    data.table::fread(instr_deploy_data),
+    hst_clean(hst_l = instr_deploy_data),
     format = "fst_dt"
   )
   
