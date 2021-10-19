@@ -235,8 +235,6 @@ leaflet_map <- function(glider_track = glider_trk,
   # SB glider
   glider_SB <- glider_track[!(is.na(lon_dd) | is.na(lat_dd)) & run_id == 2]
 
-  
-
   # detections of MBU_1 tags on glider (180kHz)
   MBU1_180 <- dtc[(receiver_site == "cormorant" | receiver_site == "mary_lou") & receiver_freq == 180 & transmitter_site == "MBU-001",]
   MBU1_180_dtc_ct <- nrow(MBU1_180)
@@ -267,7 +265,6 @@ leaflet_map <- function(glider_track = glider_trk,
   # self-detection of mary-lou and cormorant
   self_dtc_180 <- dtc[receiver_mooring_type == "mobile" & transmitter_mooring_type == "mobile" & receiver_freq == 180,]
   self_dtc_69 <- dtc[receiver_mooring_type == "mobile" & transmitter_mooring_type == "mobile" & receiver_freq == 69,]
-
 
   # now build leaflet map
   m <- leaflet()
@@ -384,9 +381,72 @@ hst_clean <- function(hst_l){
   return(hst_l)
 }
 
+#' @title utility function for formatting data reported out in receiver points table
+#' @description formats columns and names for output in receiver points table created by rec_points_2021.rmd.  This function changes adds id, site, depth_ft, lat, lon and changes order of columns
+#' @param y data table input from sentinal_depth and rec_depth targets
+#'
+#' @examples
+#' tar_load("dtc_summary_clean")
+#' y <- dtc_summary_clean
+#' formatter(y)
+
+formatter <- function(y){
+  data.table::setDT(y)
+  x <- data.table::copy(y)
+  data.table::setorder(x, receiver_run, receiver_freq, transmitter_site)
+#  set(x, j = "row_num", value = 1:nrow(x))
+  new_names <- c("trial", "receiver model", "receiver freq", "tag model", "tag id", "receiver site", "transmitter site", "first dtc", "last dtc", "num dtc")
+  setnames(x, names(x), new_names)
+  x <- x[, c("trial", "receiver model", "tag model", "tag id", "receiver freq", "receiver site", "transmitter site", "first dtc", "last dtc", "num dtc")] 
+  return(x)
+}
   
+##########################
+
+#' @title utility function that creates basic table of coordinates using flextable
+#' @description creates simple flextable for use within rmarkdown to output list of coordinates
+#' @param out_tbl data.table of information to output in report
+
+coords_table <- function(out_tbl){#, path = "output/juv_coords.html"){
+  flex <- flextable::flextable(out_tbl)
+  flex <- flextable::fontsize(flex, part = "all", size = 12)
+  flex <- flextable::bold(flex, part = "header")
+  flex <- flextable::theme_zebra(flex)
+  flex <- flextable::autofit(flex)
+  flex <- flextable::align(flex, align = "center", part = "all")
+#  flex <- flextable::add_header_row(flex, values = "", colwidths = 6)
+#  flex <- flextable::add_header_row(flex, values = paste("as of:", as.Date(Sys.time()), sep = " "),
+#                                    colwidths = 6)
+#  flex <- flextable::add_header_row(flex, values = "Juvenile cisco gear deployment", colwidths = 6)
+#  flex <- flextable::fontsize(flex, i = 1, part = "header", size = 24)
+#  flex <- flextable::bold(flex, part = "header", i = 1)
+#  flex <- flextable::fontsize(flex, i = 2, part = "header", size = 12)
+#  flex <- flextable::align(flex, align = "center", part = "header", i = 2)
+  #save_as_html(flex, path = path, title = "Juv cisco") 
+  #return(path)
+  return(flex)
+}
 
 
+#' @title extract dtc summary info
+#' @description create detection data summary table for report
+#' @param tbl data.table of tag detection summary info
+#' tar_load(vrl_vem_combined_dtc)
+#' raw_data = vrl_vem_combined_dtc
+
+
+
+.dtc_summary <- function(raw_data){
+
+  foo <- raw_data[transmitter_mooring_type == "stationary" & receiver_mooring_type == "mobile", .(min = .SD[, min(datetime)], max = .SD[, max(datetime)], count = .N), by = .(receiver_run, receiver_instr_model, receiver_freq, transmitter_instr_model, transmitter_instr_id, receiver_site, transmitter_site), .SDcols = "datetime"]
+
+  return(foo)
+
+}
+
+
+
+  
 
 
 
