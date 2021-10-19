@@ -236,31 +236,41 @@ leaflet_map <- function(glider_track = glider_trk,
   glider_SB <- glider_track[!(is.na(lon_dd) | is.na(lat_dd)) & run_id == 2]
 
   # detections of MBU_1 tags on glider (180kHz)
-  MBU1_180 <- dtc[(receiver_site == "cormorant" | receiver_site == "mary_lou") & receiver_freq == 180 & transmitter_site == "MBU-001",]
-  MBU1_180_dtc_ct <- nrow(MBU1_180)
-
- MBU1_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
- MBU1_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_180_dtc_ct)]
-
-  # detections of MBU_2 tags on glider (180kHz)
-  MBU2_180 <- dtc[(receiver_site == "cormorant" | receiver_site == "mary_lou") & receiver_freq == 180 & transmitter_site == "MBU-002",]
-  MBU2_180_dtc_ct <- nrow(MBU2_180)
+  dtc_180 <- dtc[(receiver_site == "cormorant" | receiver_site == "mary_lou") & receiver_freq == 180 & (transmitter_site == "MBU-001" | transmitter_site == "MBU-002"),]
+  dtc_180[transmitter_site == "MBU-001", color := "yellow"][transmitter_site == "MBU-002", color := "red"]
   
-  MBU2_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
-  MBU2_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_180_dtc_ct)]
+  dtc_69 <- dtc[(receiver_site == "cormorant" | receiver_site == "mary_lou") & receiver_freq == 69 & (transmitter_site == "MBU-001" | transmitter_site == "MBU-002"),]
+  dtc_69[transmitter_site == "MBU-001", color := "yellow"][transmitter_site == "MBU-002", color := "red"]
+
+  MBU1_recs <- log[instr == "receiver" & mooring_type == "stationary" & site == "MBU-001",][, ':=' (color = "yellow", radius = 16) ]
+  MBU2_recs <- log[instr == "receiver" & mooring_type == "stationary" & site == "MBU-002",][, ':=' (color = "red", radius = 16)] 
+
+
+  
+  #MBU1_180_dtc_ct <- nrow(MBU1_180)
+  
+ #MBU1_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+ #MBU1_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_180_dtc_ct)]
+  
+  # detections of MBU_2 tags on glider (180kHz)
+  ## MBU2_180 <- dtc[(receiver_site == "cormorant" | receiver_site == "mary_lou") & receiver_freq == 180 & transmitter_site == "MBU-002",]
+  ## MBU2_180_dtc_ct <- nrow(MBU2_180)
+  
+  ## MBU2_180[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  ## MBU2_180[, tag_label := sprintf("180kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_180_dtc_ct)]
 
   # detections of MBU1 tags on glider (69kHz)
-  MBU1_69 <- dtc[(receiver_site == "mary_lou" | receiver_site == "cormorant") & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & transmitter_site == "MBU-001" ,]
-  MBU1_69_dtc_ct <- nrow(MBU1_69)
+  ## MBU1_69 <- dtc[(receiver_site == "mary_lou" | receiver_site == "cormorant") & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & transmitter_site == "MBU-001" ,]
+  ## MBU1_69_dtc_ct <- nrow(MBU1_69)
 
-  MBU1_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
-  MBU1_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_69_dtc_ct)]
+  ## MBU1_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  ## MBU1_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU1_69_dtc_ct)]
 
-  MBU2_69 <- dtc[(receiver_site == "mary_lou" | receiver_site == "cormorant") & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & receiver_freq == 69 & transmitter_site == "MBU-002",]
-  MBU2_69_dtc_ct <- nrow(MBU2_69)
+  ## MBU2_69 <- dtc[(receiver_site == "mary_lou" | receiver_site == "cormorant") & (transmitter_instr_model %in% c("V13-1x-H", "V13-1x-L")) & receiver_freq == 69 & transmitter_site == "MBU-002",]
+  ## MBU2_69_dtc_ct <- nrow(MBU2_69)
   
-  MBU2_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
-  MBU2_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_69_dtc_ct)]
+  ## MBU2_69[, receiver_label := sprintf("ML depth (m): %.1f; tag-ML dist (m): %.0f; dtc date: %s", glider_m_depth, rt_distance_meters, format(datetime, "%Y-%m-%d %H:%M"))]
+  ## MBU2_69[, tag_label := sprintf("69kHz, water depth (m): %.1f; tag depth (m): %.1f; tot dtc count: %.0f", transmitter_water_depth, transmitter_instr_depth_from_top, MBU2_69_dtc_ct)]
 
   # self-detection of mary-lou and cormorant
   self_dtc_180 <- dtc[receiver_mooring_type == "mobile" & transmitter_mooring_type == "mobile" & receiver_freq == 180,]
@@ -290,6 +300,20 @@ leaflet_map <- function(glider_track = glider_trk,
   m <- addPolylines(map = m, data = glider_HB, lng = ~lon_dd, lat = ~lat_dd, color = "green")
   m <- addPolylines(map = m, data = glider_SB, lng = ~lon_dd, lat = ~lat_dd, color = "green")
 
+  m <- addCircleMarkers(map = m, data = dtc_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = ~color, radius = 9, stroke = FALSE, fillOpacity = 1, group = "180 kHz")
+  m <- addCircleMarkers(map = m, data = MBU1_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "180 kHz")
+  m <- addCircleMarkers(map = m, data = MBU2_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "180 kHz")
+
+
+  m <- addCircleMarkers(map = m, data = dtc_69, lng = ~receiver_longitude, lat = ~receiver_latitude, color = ~color, radius = 9, stroke = FALSE, fillOpacity = 1, group = "69 kHz")
+  m <- addCircleMarkers(map = m, data = MBU1_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "69 kHz", label = "MBU-001 transmitter")
+  m <- addCircleMarkers(map = m, data = MBU2_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "69 kHz", label = "MBU-002 transmitter")
+  
+
+
+  
+
+  
   #add MBU-001-180 receiver and detections
 ##   m <- addCircleMarkers(map = m, data = MBU1_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = "yellow", radius = 9, stroke = FALSE, fillOpacity = 1, group = "Tag-180-MBU1", label = ~receiver_label)
 
@@ -313,7 +337,7 @@ leaflet_map <- function(glider_track = glider_trk,
   m <- leafem::addMouseCoordinates(m)
   m <- addMeasure(m, primaryLengthUnit = "meters", secondaryLengthUnit = "kilometers")  
   #  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("Tag-180-MBU1", "Tag-180-MBU2", "Tag-69-MBU1", "Tag-69-MBU2", "self-dtc,180", "self-dtc,69", "vps"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
-  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("self-dtc 180kHz", "self-dtc 69kHz"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
+  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("self-dtc 180kHz", "self-dtc 69kHz", "180 kHz", "69 kHz"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
 
   #m <- addLegend( map = m, pal = color_pal, values = ~HPEs, title = "HPE", opacity=1)
 
@@ -395,9 +419,9 @@ formatter <- function(y){
   x <- data.table::copy(y)
   data.table::setorder(x, receiver_run, receiver_freq, transmitter_site)
 #  set(x, j = "row_num", value = 1:nrow(x))
-  new_names <- c("trial", "receiver model", "receiver freq", "tag model", "tag id", "receiver site", "transmitter site", "first dtc", "last dtc", "num dtc")
+  new_names <- c("trial", "receiver model", "receiver freq", "tag model", "tag id", "receiver site", "tag site", "first dtc", "last dtc", "num dtc")
   setnames(x, names(x), new_names)
-  x <- x[, c("trial", "receiver model", "tag model", "tag id", "receiver freq", "receiver site", "transmitter site", "first dtc", "last dtc", "num dtc")] 
+  x <- x[, c("trial", "receiver model", "tag model", "tag id", "receiver freq", "receiver site", "tag site", "first dtc", "last dtc", "num dtc")] 
   return(x)
 }
   

@@ -1,6 +1,6 @@
 ---
 title: "Detection summary- glider range test, cisco survey"
-date: "as of `r format(Sys.time(), '%m/%d/%Y')` "
+date: "as of `r format(Sys.time(), '%m/%d/%Y %H:%M')` "
 output:
   html_document
 ---
