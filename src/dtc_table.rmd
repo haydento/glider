@@ -1,0 +1,35 @@
+---
+title: "Detection summary- glider range test, cisco survey"
+date: "as of `r format(Sys.time(), '%m/%d/%Y')` "
+output:
+  html_document
+---
+
+<style type="text/css">
+
+h1.title {
+	font-size: 34px;
+	text-align: center;
+	}
+	
+h4.date {
+   font-size: 18px;
+   text-align: center;
+   }
+   	
+</style>
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+
+tar_load(dtc_summary_clean)
+
+report <- formatter(dtc_summary_clean)
+
+coords_table(out_tbl = report)
+
+
+# see links below for info about customizing output.
+# https://babichmorrowc.github.io/post/changing-fonts-in-rmarkdown-pdfs/
+# used flextable to style table
+
+```

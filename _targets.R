@@ -1,8 +1,9 @@
 library(targets)
+library(tarchetypes)
 source("src/functions.R")
 source("src/vem.R")
 
-tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr", "geosphere", "leafem"))
+tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr", "geosphere", "leafem", "tarchetypes"))
 
 list(
 
@@ -49,9 +50,10 @@ list(
     read_vem(vem_data)$status,
     format = "fst_dt"
   ),
-  
+
+  #all glider detections with interpolated lat/lon.look here for fish detections
   tar_target(
-    clean_vem_detections, #all glider detections.  look here for fish detections
+    clean_vem_detections, 
     infer_detection_locations(read_vem(vem_data)$detections, glider_trk),
     format = "fst_dt"
   ),
@@ -136,11 +138,14 @@ list(
     trial_id,
     trial_parser(pth = glider_trial),
     format = "fst_dt"
-  )
-  
-  
-  
+  ),
 
+  tar_render(dtc_summary, "src/dtc_table.rmd", output_dir = "output", output_file = "dtc_summary.html"),
+  tar_target(
+    dtc_summary_clean,
+    .dtc_summary(raw_data = vrl_vem_combined_dtc),
+    format = "fst_dt"
+  )
   
 )
 
