@@ -470,7 +470,126 @@ coords_table <- function(out_tbl){#, path = "output/juv_coords.html"){
 
 
 
-  
+#########################################3  
+#' @title impute missing detections
+#' @param dtc detections for a tag
+#' @param t_thresh threshold of time between successive detections that trigger imputation of tag transmissions
+#' 
+#' @examples
+#' tar_load("vrl_vem_combined_dtc")
+#' dtc <- vrl_vem_combined_dtc
+#'# for Devi
+#' test <- dtc[receiver_run == 2 & receiver_freq == 69 & (transmitter_instr_id == "A69-1604-32404"), c("datetime", "transmitter_instr_model", "transmitter_freq", "transmitter_instr_id")]
+#' dtc <- test
+
+#' impute_dtc(dtc = test, t_thresh = 240)
+
+impute_dtc <- function(dtc, t_thresh = 240){
+  dtcc <- data.table::copy(dtc)
+  setkey(dtcc, datetime)
+  input_names <- names(dtc)
+    dtcc[, lag_time := data.table::shift(datetime, type = "lead")]
+  dtcc[, time_diff := as.numeric(lag_time - datetime, units = "secs")]
+  dtcc[, num_missing := 0]
+  dtcc[time_diff > t_thresh, num_missing := time_diff%/%t_thresh]
+  dtcc <- dtcc[rep(dtcc[, .I], num_missing+1),]
+  dtcc[, imputed := as.numeric(duplicated(dtcc, by = "datetime"))]
+  dtcc[imputed == 1, datetime := NA]
+  dtcc[, datetime := as.POSIXct(na_interpolation(as.numeric(dtcc$datetime)), origin = "1970-01-01 00:00:00", tz = "UTC")]
+  out <- c(input_names, "imputed")
+  bar <- dtcc[, ..out]
+  return(bar)
+}
+
+
+#' @title interpolate time series
+#' @description Interpolate NAs in time series vector.  Function borrowed from "imputeTS::na_interpolation" package
+#' @param x numeric vector or time series objetct, NAs will be replaced
+#' @param option interpolation algorithm to be used.  Can be "linear", "spline", "stine"
+#' @param maxgap max number of successive NAs that will be imputed.  Default is to replace all NAs.  If maxgap is provided, then NAs will be left on values greater than maxgap.
+#' @details missing values (NAs) will get replaced by values from approx, spline, or stinterp interpolation
+
+
+na_interpolation <- function (x, option = "linear", maxgap = Inf, ...) 
+{
+    data <- x
+    if (!is.null(dim(data)[2]) && dim(data)[2] > 1) {
+        for (i in 1:dim(data)[2]) {
+            if (!anyNA(data[, i])) {
+                next
+            }
+            tryCatch(data[, i] <- na_interpolation(data[, i], 
+                option, maxgap), error = function(cond) {
+                warning(paste("imputeTS: No imputation performed for column", 
+                  i, "because of this", cond), call. = FALSE)
+            })
+        }
+        return(data)
+    }
+    else {
+        missindx <- is.na(data)
+        if (!anyNA(data)) {
+            return(data)
+        }
+        if (any(class(data) == "tbl")) {
+            data <- as.vector(as.data.frame(data)[, 1])
+        }
+        if (sum(!missindx) < 2) {
+            stop("Input data needs at least 2 non-NA data point for applying na_interpolation")
+        }
+        if (!is.null(dim(data)[2]) && !dim(data)[2] == 1) {
+            stop("Wrong input type for parameter x")
+        }
+        if (!is.null(dim(data)[2])) {
+            data <- data[, 1]
+        }
+        if (!is.numeric(data)) {
+            stop("Input x is not numeric")
+        }
+        n <- length(data)
+        allindx <- 1:n
+        indx <- allindx[!missindx]
+        data_vec <- as.vector(data)
+        if (option == "linear") {
+            interp <- stats::approx(indx, data_vec[indx], 1:n, 
+                rule = 2, ...)$y
+        }
+        else if (option == "spline") {
+            interp <- stats::spline(indx, data_vec[indx], n = n, 
+                ...)$y
+        }
+        else if (option == "stine") {
+            interp <- stinepack::stinterp(indx, data_vec[indx], 
+                1:n, ...)$y
+            if (any(is.na(interp))) {
+                interp <- na_locf(interp, na_remaining = "rev")
+            }
+        }
+        else {
+            stop("Wrong parameter 'option' given. Value must be either 'linear', 'spline' or 'stine'.")
+        }
+        data[missindx] <- interp[missindx]
+        if (is.finite(maxgap) && maxgap >= 0) {
+            rlencoding <- rle(is.na(x))
+            rlencoding$values[rlencoding$lengths <= maxgap] <- FALSE
+            en <- inverse.rle(rlencoding)
+            data[en == TRUE] <- NA
+        }
+        if (!is.null(dim(x)[2])) {
+            x[, 1] <- data
+            return(x)
+        }
+        return(data)
+    }
+}
+
+
+
+
+
+
+
+
 
 
 
