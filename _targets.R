@@ -145,8 +145,40 @@ list(
     dtc_summary_clean,
     .dtc_summary(raw_data = vrl_vem_combined_dtc),
     format = "fst_dt"
+  ),
+
+  # impute missed detections on tags 
+  tar_target(
+    imputed_transmissions,
+    impute_missing_transmissions(dtc = vrl_vem_combined_dtc, ref_tags = c("A69-1604-32405",
+                                                                          "A69-1604-32406",
+                                                                          "A180-1702-61650",
+                                                                          "A180-1702-61651",
+                                                                          "A69-1604-32401",
+                                                                          "A69-1604-32402"),
+                                 run = 1,
+                                 ref_receivers = c("MBU-001", "MBU-002"),
+                                 thresh = list("A69-1604-32405" = 240,
+                                               "A69-1604-32406" = 240,
+                                               "A180-1702-61650" = 120,
+                                               "A180-1702-61651" = 120,
+                                               "A69-1604-32401" = 240,
+                                               "A69-1604-32402" = 240)),
+    format = "fst_dt"
+  ),
+
+  tar_target(
+    glider_dtc_transmissions,
+    glider_dtc(dtc = vrl_vem_combined_dtc, ref_tags = c("A69-1604-32405",
+                                                        "A69-1604-32406",
+                                                        "A180-1702-61650",
+                                                        "A180-1702-61651",
+                                                        "A69-1604-32401",
+                                                        "A69-1604-32402"),
+               receiver_site = "mary_lou", tag_beeps = imputed_transmissions, glider_geo = glider_trk),
+    format = "fst_dt"
   )
-  
+
 )
 
 

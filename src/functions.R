@@ -481,6 +481,7 @@ coords_table <- function(out_tbl){#, path = "output/juv_coords.html"){
 #'# for Devi
 #' test <- dtc[receiver_run == 2 & receiver_freq == 69 & (transmitter_instr_id == "A69-1604-32404"), c("datetime", "transmitter_instr_model", "transmitter_freq", "transmitter_instr_id")]
 #' dtc <- test
+#' t_thresh = 240
 
 #' impute_dtc(dtc = test, t_thresh = 240)
 
@@ -493,6 +494,7 @@ impute_dtc <- function(dtc, t_thresh = 240){
   dtcc[, num_missing := 0]
   dtcc[time_diff > t_thresh, num_missing := time_diff%/%t_thresh]
   dtcc <- dtcc[rep(dtcc[, .I], num_missing+1),]
+
   dtcc[, imputed := as.numeric(duplicated(dtcc, by = "datetime"))]
   dtcc[imputed == 1, datetime := NA]
   dtcc[, datetime := as.POSIXct(na_interpolation(as.numeric(dtcc$datetime)), origin = "1970-01-01 00:00:00", tz = "UTC")]
@@ -586,26 +588,6 @@ na_interpolation <- function (x, option = "linear", maxgap = Inf, ...)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # junk below...
 #########################
 
@@ -633,3 +615,69 @@ na_interpolation <- function (x, option = "linear", maxgap = Inf, ...)
 ## foo <- diff(dtc$datetime)
 ## hist(as.numeric(foo))
 ## range(foo)
+
+#' tar_load("vrl_vem_combined_dtc")
+#' dtc <- vrl_vem_combined_dtc
+#' ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402")
+#' run = 1
+#' ref_receivers = c("MBU-001", "MBU-002")
+#'  thresh = list("A69-1604-32405" = 240, "A69-1604-32406" = 240, "A180-1702-61650" = 120, "A180-1702-61651" = 120, "A69-1604-32401" = 240, "A69-1604-32402" = 240)
+#' tag_beeps = impute_missing_transmissions(dtc = dtc, ref_tags = ref_tags, run = run, ref_receivers = ref_receivers, thresh = thresh)
+
+impute_missing_transmissions <- function(dtc, ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402"), run = 1, ref_receivers = c("MBU-001", "MBU-002"), thresh = list("A69-1604-32405" = 240, "A69-1604-32406" = 240, "A180-1702-61650" = 120, "A180-1702-61651" = 120, "A69-1604-32401" = 240, "A69-1604-32402" = 240)){
+  
+  beeps <- dtc[receiver_run %in% run & transmitter_instr_id %in% ref_tags & receiver_site %in% ref_receivers, c("datetime", "receiver_run", "transmitter_instr_id", "transmitter_instr_model", "transmitter_freq", "transmitter_longitude", "transmitter_latitude", "receiver_site", "receiver_instr_model")] 
+  setnames(beeps, c("receiver_run"), c("trial"))
+  setkey(beeps, datetime)
+  
+  imputed_trans <- function(x, y){
+    beeps.i <- beeps[transmitter_instr_id == x,]
+    beeps.i$thresh <- y[[beeps.i$transmitter_instr_id[1]]]
+    out <- impute_dtc(dtc = beeps.i, t_thresh = beeps.i$thresh[1])
+
+    return(out)
+  }
+
+  out <- lapply(ref_tags, imputed_trans, thresh)
+  out <- rbindlist(out)
+  return(out)
+}
+
+
+
+
+
+#' tar_load("vrl_vem_combined_dtc")
+#' dtc <- vrl_vem_combined_dtc
+#' ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402")
+#' run = 1
+#' receiver_site = "mary_lou",
+#' tar_load(glider_trk)
+#' glider_geo = glider_trk
+
+glider_dtc <- function(dtc, ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402"), receiver_site = "mary_lou", tag_beeps, glider_geo){ 
+
+
+glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% "mary_lou", c("datetime", "transmitter_instr_id", "receiver_site", "glider_lat_dd", "glider_lon_dd")]
+  glider_dtc[, tran_dtc := 1]
+  tag_beeps[, tran_dtc := 0]
+  tag_beeps[glider_dtc, ':=' (tran_dtc = 1, glider_lat = glider_lat_dd, glider_lon = glider_lon_dd), on = .(transmitter_instr_id = transmitter_instr_id, datetime = datetime), roll = "nearest"]
+
+  tag_beeps[, `:=`(glider_lon = approx(x = glider_geo$time[!is.na(glider_geo$lon_dd)],
+                                       y = glider_geo$lon_dd[!is.na(glider_geo$lon_dd)],
+                                       xout = datetime,
+                                       ties = "ordered")$y,
+                   glider_lat = approx(x = glider_geo$time[!is.na(glider_geo$lat_dd)],
+                                       y = glider_geo$lat_dd[!is.na(glider_geo$lon_dd)],
+                                       xout = datetime,
+                                       ties = "ordered")$y,
+                   rt_distance_m = geosphere::distVincentyEllipsoid(p1 = cbind(glider_lon, glider_lat), p2 = cbind(transmitter_longitude, transmitter_latitude)))]
+  return(tag_beeps[])
+}
+
+
+  
+  
+
+
+  
