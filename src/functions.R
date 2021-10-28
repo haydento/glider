@@ -651,7 +651,11 @@ impute_missing_transmissions <- function(dtc, ref_tags = c("A69-1604-32405", "A6
 #' dtc <- vrl_vem_combined_dtc
 #' ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402")
 #' run = 1
-#' receiver_site = "mary_lou",
+#' receiver_site = "mary_lou"
+#' tar_load(glider_trk)
+#' glider_geo = glider_trk
+#' tar_load("imputed_transmissions")
+#' tag_beeps = imputed_transmissions
 #' tar_load(glider_trk)
 #' glider_geo = glider_trk
 
@@ -659,10 +663,11 @@ glider_dtc <- function(dtc, ref_tags = c("A69-1604-32405", "A69-1604-32406", "A1
 
 
 glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% "mary_lou", c("datetime", "transmitter_instr_id", "receiver_site", "glider_lat_dd", "glider_lon_dd")]
+
   glider_dtc[, tran_dtc := 1]
   tag_beeps[, tran_dtc := 0]
   tag_beeps[glider_dtc, ':=' (tran_dtc = 1, glider_lat = glider_lat_dd, glider_lon = glider_lon_dd), on = .(transmitter_instr_id = transmitter_instr_id, datetime = datetime), roll = "nearest"]
-
+  
   tag_beeps[, `:=`(glider_lon = approx(x = glider_geo$time[!is.na(glider_geo$lon_dd)],
                                        y = glider_geo$lon_dd[!is.na(glider_geo$lon_dd)],
                                        xout = datetime,
@@ -672,7 +677,10 @@ glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% "mary_
                                        xout = datetime,
                                        ties = "ordered")$y,
                    rt_distance_m = geosphere::distVincentyEllipsoid(p1 = cbind(glider_lon, glider_lat), p2 = cbind(transmitter_longitude, transmitter_latitude)))]
-  return(tag_beeps[])
+
+
+
+  return(tag_beeps)
 }
 
 
@@ -681,3 +689,8 @@ glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% "mary_
 
 
   
+## tar_load("glider_dtc_transmissions")
+## dtc <- glider_dtc_transmissions
+
+
+## plot(tran_dtc ~ rt_distance_m, data = tag_beeps[transmitter_instr_id == "A69-1604-32405"], pch = 16, xlim = c(0,1000))
