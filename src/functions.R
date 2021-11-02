@@ -626,7 +626,7 @@ na_interpolation <- function (x, option = "linear", maxgap = Inf, ...)
 
 impute_missing_transmissions <- function(dtc, ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402"), run = 1, ref_receivers = c("MBU-001", "MBU-002"), thresh = list("A69-1604-32405" = 240, "A69-1604-32406" = 240, "A180-1702-61650" = 120, "A180-1702-61651" = 120, "A69-1604-32401" = 240, "A69-1604-32402" = 240)){
   
-  beeps <- dtc[receiver_run %in% run & transmitter_instr_id %in% ref_tags & receiver_site %in% ref_receivers, c("datetime", "receiver_run", "transmitter_instr_id", "transmitter_instr_model", "transmitter_freq", "transmitter_longitude", "transmitter_latitude", "receiver_site", "receiver_instr_model")] 
+  beeps <- dtc[receiver_run %in% run & transmitter_instr_id %in% ref_tags, c("datetime", "receiver_run", "transmitter_instr_id", "transmitter_instr_model", "transmitter_freq", "transmitter_longitude", "transmitter_latitude", "receiver_site", "receiver_instr_model")] 
   setnames(beeps, c("receiver_run"), c("trial"))
   setkey(beeps, datetime)
   
@@ -659,10 +659,10 @@ impute_missing_transmissions <- function(dtc, ref_tags = c("A69-1604-32405", "A6
 #' tar_load(glider_trk)
 #' glider_geo = glider_trk
 
-glider_dtc <- function(dtc, ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402"), receiver_site = "mary_lou", tag_beeps, glider_geo){ 
+glider_dtc <- function(dtc, ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402"), receiver_site = "cormorant", tag_beeps, glider_geo){ 
 
 
-glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% "mary_lou", c("datetime", "transmitter_instr_id", "receiver_site", "glider_lat_dd", "glider_lon_dd")]
+glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% "cormorant", c("datetime", "transmitter_instr_id", "receiver_site", "glider_lat_dd", "glider_lon_dd")]
 
   glider_dtc[, tran_dtc := 1]
   tag_beeps[, tran_dtc := 0]
