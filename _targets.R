@@ -3,7 +3,7 @@ library(tarchetypes)
 source("src/functions.R")
 source("src/vem.R")
 
-tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr", "geosphere", "leafem", "tarchetypes"))
+tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr", "geosphere", "leafem", "tarchetypes", "mgcv"))
 
 list(
 
