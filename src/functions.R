@@ -666,3 +666,31 @@ glider_dtc <- function(dtc, receiver_site = c("cormorant", "mary_lou"), tag_beep
 
 ## unique(glider_dtc_transmissions$transmitter_instr_id)
 
+tar_load("glider_dtc_transmissions")
+dtc <- glider_dtc_transmissions[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & rt_distance_m < 3000]
+dtc[transmitter_freq == 180, col := "red"][transmitter_freq == 69, col := "black"] 
+
+
+
+mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", by = as.factor(transmitter_freq), k = 15), data = dtc, family = "binomial")
+
+dtc[, mod_fit := predict(mod, type = "response")]
+
+setkey(dtc, transmitter_freq, rt_distance_m)
+
+
+pdf("output/initial_range_curves.pdf")
+par(mfrow = c(2,1))
+plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 180], pch = 16, col = "black", main = "180 kHz", xlim = c(0,500), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
+lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 180], col = "red")
+
+plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69 kHz", xlim = c(0,3000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
+lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
+dev.off()
+
+
+
+gam.check(mod)
+plot.gam(mod)
+
+plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69])
