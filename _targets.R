@@ -150,79 +150,15 @@ list(
   # impute missed detections on tags 
   tar_target(
     imputed_transmissions,
-    impute_missing_transmissions(dtc = vrl_vem_combined_dtc, ref_tags = c("A69-1604-32405",
-                                                                          "A69-1604-32406",
-                                                                          "A180-1702-61650",
-                                                                          "A180-1702-61651",
-                                                                          "A69-1604-32401",
-                                                                          "A69-1604-32402"),
-                                 run = 2,
-<<<<<<< HEAD
-                                 ref_receivers = c("MBU-001", "MBU-002"),
-=======
->>>>>>> 53cdf693f16a7d4818a1415bc0e5b444a27fe710
-                                 thresh = list("A69-1604-32405" = 240,
-                                               "A69-1604-32406" = 240,
-                                               "A180-1702-61650" = 120,
-                                               "A180-1702-61651" = 120,
-                                               "A69-1604-32401" = 240,
-                                               "A69-1604-32402" = 240)),
+    impute_missing_transmissions(dtc = vrl_vem_combined_dtc, hst = hst),
     format = "fst_dt"
   ),
 
-  tar_target(
-    glider_dtc_transmissions,
-    glider_dtc(dtc = vrl_vem_combined_dtc, ref_tags = c("A69-1604-32405",
-                                                        "A69-1604-32406",
-                                                        "A180-1702-61650",
-                                                        "A180-1702-61651",
-                                                        "A69-1604-32401",
-                                                        "A69-1604-32402"),
-               receiver_site = "cormorant", tag_beeps = imputed_transmissions, glider_geo = glider_trk),
-    format = "fst_dt"
-  )
-
+ tar_target(
+   glider_dtc_transmissions,
+   glider_dtc(dtc = vrl_vem_combined_dtc, receiver_site = c("cormorant", "mary_lou"), tag_beeps = imputed_transmissions, glider_geo = glider_trk),
+   format = "fst_dt"
 )
 
+ )
 
-## foo <- glider_dtc_transmissions[transmitter_instr_id == "A69-1604-32405",]
-
-## foo[tran_dtc == 0,]
-## plot(foo$rt_distance_m, foo$tran_dtc, pch = 16)
-
-# 180 tags
-## tar_load("clean_vem_detections_geo")
-
-## dtc <- clean_vem_detections_geo[transmitter_freq == "180" & transmitter_mooring_type == "stationary",]
-
-## #MBU-001
-## pdf("output/180_receivers_distance_detected.pdf")
-## boxplot(rt_distance_meters ~ transmitter_site,
-##         data = dtc,
-##         ylim = c(0, 500), xlab = NA, las = 1, ylab = "tag-receiver distance", main = "180kHz distance detected")
-## dev.off()
-
-## pdf("output/180_receivers_glider_dpth_detection.pdf")
-## boxplot(glider_m_depth ~ transmitter_site, data = dtc,
-##         ylim = c(0,40), las = 1, ylab = "glider depth at detection", main = "glider depth at detection")
-
-## dev.off()
-
-## pdf("output/180_receivers_tag_receiver_dist.pdf")
-## hist(dtc$rt_distance_meters, xlab = "tag receiver distance (m)", main = "tag-receiver distance")
-## dev.off()
-
-## dtc <- clean_vem_detections_geo[transmitter_freq == "69" & transmitter_mooring_type == "stationary" & transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H"), ]
-## dtc[, id := paste(transmitter_instr_model, transmitter_site, sep = ",")]
-
-
-## boxplot(rt_distance_meters ~ id, data = dtc)
-## boxplot(glider_m_depth ~ id, data = dtc)
-
-
-## ##################
-## tar_load("clean_vem_detections_geo")
-
-## dtc <- clean_vem_detections_geo[transmitter_instr_id == "A180-1702-61651",]
-
-## diff(dtc$datetime)
