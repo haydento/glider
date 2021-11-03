@@ -156,7 +156,7 @@ list(
                                                                           "A180-1702-61651",
                                                                           "A69-1604-32401",
                                                                           "A69-1604-32402"),
-                                 run = 1,
+                                 run = 2,
                                  ref_receivers = c("MBU-001", "MBU-002"),
                                  thresh = list("A69-1604-32405" = 240,
                                                "A69-1604-32406" = 240,
@@ -175,13 +175,17 @@ list(
                                                         "A180-1702-61651",
                                                         "A69-1604-32401",
                                                         "A69-1604-32402"),
-               receiver_site = "mary_lou", tag_beeps = imputed_transmissions, glider_geo = glider_trk),
+               receiver_site = "cormorant", tag_beeps = imputed_transmissions, glider_geo = glider_trk),
     format = "fst_dt"
   )
 
 )
 
 
+## foo <- glider_dtc_transmissions[transmitter_instr_id == "A69-1604-32405",]
+
+## foo[tran_dtc == 0,]
+## plot(foo$rt_distance_m, foo$tran_dtc, pch = 16)
 
 # 180 tags
 ## tar_load("clean_vem_detections_geo")

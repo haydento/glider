@@ -587,8 +587,6 @@ na_interpolation <- function (x, option = "linear", maxgap = Inf, ...)
 
 
 
-
-# junk below...
 #########################
 
 ## x <- data.table(dist = c(500,500,1000,500,250,2000,500,2000,500,5000,5000,500))
@@ -601,8 +599,6 @@ na_interpolation <- function (x, option = "linear", maxgap = Inf, ...)
 ##   x[dist < 1000 & is.na(lag_dist), arrive := 1]
 ##   x[dist < 1000 & is.na(lead_dist), depart := 1]
 ##   x[, event := cumsum(arrive), ]
-
-  
 
 ## tar_load("vrl_vem_combined_dtc")
 ## dtc <- vrl_vem_combined_dtc
@@ -659,10 +655,10 @@ impute_missing_transmissions <- function(dtc, ref_tags = c("A69-1604-32405", "A6
 #' tar_load(glider_trk)
 #' glider_geo = glider_trk
 
-glider_dtc <- function(dtc, ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402"), receiver_site = "mary_lou", tag_beeps, glider_geo){ 
+glider_dtc <- function(dtc, ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402"), rec_site = "mary_lou", tag_beeps, glider_geo){ 
 
 
-glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% "mary_lou", c("datetime", "transmitter_instr_id", "receiver_site", "glider_lat_dd", "glider_lon_dd")]
+glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% , c("datetime", "transmitter_instr_id", "receiver_site", "glider_lat_dd", "glider_lon_dd")]
 
   glider_dtc[, tran_dtc := 1]
   tag_beeps[, tran_dtc := 0]
@@ -677,8 +673,6 @@ glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% "mary_
                                        xout = datetime,
                                        ties = "ordered")$y,
                    rt_distance_m = geosphere::distVincentyEllipsoid(p1 = cbind(glider_lon, glider_lat), p2 = cbind(transmitter_longitude, transmitter_latitude)))]
-
-
 
   return(tag_beeps)
 }
