@@ -586,84 +586,64 @@ na_interpolation <- function (x, option = "linear", maxgap = Inf, ...)
 }
 
 
-
-#########################
-
-## x <- data.table(dist = c(500,500,1000,500,250,2000,500,2000,500,5000,5000,500))
-##   trk[, lag_dist := shift(dist, type = "lag")]
-##   x[, lead_dist := shift(dist, type = "lead")]
-##   x[, arrive := 0]
-##   x[, depart := 0]
-##   x[dist < 1000 & lag_dist > 1000, arrive := 1]
-##   x[dist < 1000 & lead_dist >1000, depart := 1]
-##   x[dist < 1000 & is.na(lag_dist), arrive := 1]
-##   x[dist < 1000 & is.na(lead_dist), depart := 1]
-##   x[, event := cumsum(arrive), ]
-
-## tar_load("vrl_vem_combined_dtc")
-## dtc <- vrl_vem_combined_dtc
-
-## dtc[receiver_site == "MBU-001" & transmitter_instr_id %in% c("A69-1604-32405", "A69-1604-32406"),]
-## dtc[transmitter_instr_id %in% c("A69-1604-32405", "A69-1604-32406"),]
-## foo <- dtc[receiver_site == "mary_lou" & transmitter_instr_id %in% c("A69-1604-32405", "A69-1604-32406")]
-## unique(foo$transmitter_instr_id)
-## setkey(dtc, datetime)
-## foo <- diff(dtc$datetime)
-## hist(as.numeric(foo))
-## range(foo)
-
+#' @title impute tag transmissions from colocated tag and receiver
+#' @param dtc combined detection/vem dataset
+#' @param hst cleaned gear deployment info
+#' 
+#' @examples
 #' tar_load("vrl_vem_combined_dtc")
-#' dtc <- vrl_vem_combined_dtc
-#' ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402")
-#' run = 1
-#' ref_receivers = c("MBU-001", "MBU-002")
-#'  thresh = list("A69-1604-32405" = 240, "A69-1604-32406" = 240, "A180-1702-61650" = 120, "A180-1702-61651" = 120, "A69-1604-32401" = 240, "A69-1604-32402" = 240)
-#' tag_beeps = impute_missing_transmissions(dtc = dtc, ref_tags = ref_tags, run = run, ref_receivers = ref_receivers, thresh = thresh)
+#' tar_load("hst")
+#'  dtc <- vrl_vem_combined_dtc
 
-impute_missing_transmissions <- function(dtc, ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402"), run = 1, ref_receivers = c("MBU-001", "MBU-002"), thresh = list("A69-1604-32405" = 240, "A69-1604-32406" = 240, "A180-1702-61650" = 120, "A180-1702-61651" = 120, "A69-1604-32401" = 240, "A69-1604-32402" = 240)){
-  
-  beeps <- dtc[receiver_run %in% run & transmitter_instr_id %in% ref_tags, c("datetime", "receiver_run", "transmitter_instr_id", "transmitter_instr_model", "transmitter_freq", "transmitter_longitude", "transmitter_latitude", "receiver_site", "receiver_instr_model")] 
-  setnames(beeps, c("receiver_run"), c("trial"))
-  setkey(beeps, datetime)
-  
-  imputed_trans <- function(x, y){
-    beeps.i <- beeps[transmitter_instr_id == x,]
-    beeps.i$thresh <- y[[beeps.i$transmitter_instr_id[1]]]
+impute_missing_transmissions <- function(dtc, hst){
+
+  # find co-located receiver for each stationary tag
+  tags <- hst[instr == "tag" & mooring_type == "stationary"]
+  recs <- hst[instr == "receiver" & mooring_type == "stationary"]
+  tags[recs, `:=` (colocated_rec = i.instr_id), on = .(run_id, run, site, freq)] 
+
+  #
+  beeps <- dtc[tags, .(datetime, trial = receiver_run, transmitter_instr_id, transmitter_instr_model, transmitter_freq, transmitter_longitude, transmitter_latitude, receiver_site, receiver_instr_model, colocated_rec, tag_min_delay, tag_max_delay), on = .(receiver_run_id = run_id, receiver_serial_no = colocated_rec, transmitter_instr_id = instr_id), nomatch = NULL]
+  beeps[, thresh := tag_min_delay + tag_max_delay]
+
+  setkey(beeps, transmitter_instr_id, datetime)
+  tags <-  unique(beeps$transmitter_instr_id)
+
+  #x = "A180-1702-61650"
+  #y = beeps
+  #imputed_trams(x, y = beeps)
+    
+  imputed_trans <- function(x, y = beeps){
+    beeps.i <- y[transmitter_instr_id == x,]
     out <- impute_dtc(dtc = beeps.i, t_thresh = beeps.i$thresh[1])
-
     return(out)
   }
-
-  out <- lapply(ref_tags, imputed_trans, thresh)
+  
+  out <- lapply(tags, imputed_trans, y = beeps)
   out <- rbindlist(out)
   return(out)
 }
 
 
 
-
-
+#' @title calculates distance between glider and tag for all transmissions, identifies detections of transmissions
+#' @examples
 #' tar_load("vrl_vem_combined_dtc")
 #' dtc <- vrl_vem_combined_dtc
-#' ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402")
-#' run = 1
-#' receiver_site = "mary_lou"
-#' tar_load(glider_trk)
-#' glider_geo = glider_trk
 #' tar_load("imputed_transmissions")
 #' tag_beeps = imputed_transmissions
 #' tar_load(glider_trk)
 #' glider_geo = glider_trk
+#' receiver_site = c("cormorant", "mary_lou")
+#' 
 
-glider_dtc <- function(dtc, ref_tags = c("A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651", "A69-1604-32401", "A69-1604-32402"), receiver_site = "cormorant", tag_beeps, glider_geo){ 
+glider_dtc <- function(dtc, receiver_site = c("cormorant", "mary_lou"), tag_beeps, glider_geo){ 
 
+  glider_dtc <- dtc[receiver_mooring_type == "mobile" & receiver_site %in% receiver_site, c("datetime", "transmitter_instr_id", "receiver_site", "glider_lat_dd", "glider_lon_dd")]
 
-glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% "cormorant", c("datetime", "transmitter_instr_id", "receiver_site", "glider_lat_dd", "glider_lon_dd")]
+  set(tag_beeps, j = "tran_dtc", value =  0)
+  tag_beeps[glider_dtc, ':=' (tran_dtc = 1, glider_lat = glider_lat_dd, glider_lon = glider_lon_dd, glider_dtc_time = datetime), on = .(transmitter_instr_id = transmitter_instr_id, datetime = datetime), roll = 3600]
 
-  glider_dtc[, tran_dtc := 1]
-  tag_beeps[, tran_dtc := 0]
-  tag_beeps[glider_dtc, ':=' (tran_dtc = 1, glider_lat = glider_lat_dd, glider_lon = glider_lon_dd), on = .(transmitter_instr_id = transmitter_instr_id, datetime = datetime), roll = "nearest"]
-  
   tag_beeps[, `:=`(glider_lon = approx(x = glider_geo$time[!is.na(glider_geo$lon_dd)],
                                        y = glider_geo$lon_dd[!is.na(glider_geo$lon_dd)],
                                        xout = datetime,
@@ -671,20 +651,18 @@ glider_dtc <- dtc[transmitter_instr_id %in% ref_tags & receiver_site %in% "cormo
                    glider_lat = approx(x = glider_geo$time[!is.na(glider_geo$lat_dd)],
                                        y = glider_geo$lat_dd[!is.na(glider_geo$lon_dd)],
                                        xout = datetime,
-                                       ties = "ordered")$y,
-                   rt_distance_m = geosphere::distVincentyEllipsoid(p1 = cbind(glider_lon, glider_lat), p2 = cbind(transmitter_longitude, transmitter_latitude)))]
+                                       ties = "ordered")$y)]
+  
+  tag_beeps[, rt_distance_m := geosphere::distVincentyEllipsoid(p1 = cbind(glider_lon, glider_lat), p2 = cbind(transmitter_longitude, transmitter_latitude))]
 
   return(tag_beeps)
 }
 
 
-  
-  
 
 
-  
-## tar_load("glider_dtc_transmissions")
-## dtc <- glider_dtc_transmissions
+## tar_load(glider_dtc_transmissions)
+## plot(tran_dtc ~ rt_distance_m, data = glider_dtc_transmissions[transmitter_instr_id == "A69-1604-32406" & trial == 1], xlim = c(0,3000), col = "red", pch = 16)
 
+## unique(glider_dtc_transmissions$transmitter_instr_id)
 
-## plot(tran_dtc ~ rt_distance_m, data = tag_beeps[transmitter_instr_id == "A69-1604-32405"], pch = 16, xlim = c(0,1000))
