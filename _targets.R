@@ -147,6 +147,13 @@ list(
     format = "fst_dt"
   ),
 
+  # determine times when we have real-time data in hand
+  tar_target(
+    data_present,
+    .data_present(dtc = vrl_vem_combined_dtc, hst = hst, thresh_sec = (3600*24)),
+    format = "fst_dt"
+    ),
+
   # impute missed detections on tags 
   tar_target(
     imputed_transmissions,
@@ -154,11 +161,18 @@ list(
     format = "fst_dt"
   ),
 
+  
  tar_target(
    glider_dtc_transmissions,
    glider_dtc(dtc = vrl_vem_combined_dtc, receiver_site = c("cormorant", "mary_lou"), tag_beeps = imputed_transmissions, glider_geo = glider_trk),
    format = "fst_dt"
-)
+ ),
 
+ tar_target(
+   glider_dtc_range,
+   glider_dtc_transmissions_time_filtered(dtc = glider_dtc_transmissions, inter = data_present),
+   format = "fst_dt"
+ )
+   
  )
 
