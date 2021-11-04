@@ -625,6 +625,40 @@ impute_missing_transmissions <- function(dtc, hst){
 }
 
 
+#' @title identify periods of time when data were collected as indicated by reporting of self-detection transmissions of glider tag on glider receiver.
+#' @description Although glider was actively listening during the entire mission, real-time data was not sent back for entire time period.  This function identifies when data is present by evaluating when tag on glider was detected under the assumption that detection probability on the glider was very close to 1.  Distance between tag and receiver on glider was approximately 0.5 m.
+#'
+#' @examples
+#' tar_load("vrl_vem_combined_dtc")
+#' dtc <- vrl_vem_combined_dtc
+#' tar_load("hst")
+#' .data_present(dtc = dtc, hst = hst, thresh_sec = 86400)
+
+
+.data_present <- function(dtc, hst, thresh_sec = 86400){
+  # find co-located receiver for mobile tag
+  tags <- hst[instr == "tag" & mooring_type == "mobile" & instr_model != "V5D-1x"]
+  recs <- hst[instr == "receiver" & mooring_type == "mobile", ]
+  tags[recs, `:=` (colocated_rec = i.instr_id), on = .(run_id, run, site, freq)] 
+
+  beeps <- dtc[tags, .(datetime, trial = receiver_run, transmitter_instr_id, transmitter_instr_model, transmitter_freq, transmitter_longitude, transmitter_latitude, receiver_site, receiver_instr_model, colocated_rec, tag_min_delay, tag_max_delay), on = .(receiver_run_id = run_id, receiver_serial_no = colocated_rec, transmitter_instr_id = instr_id), nomatch = NULL]
+setkey(beeps, datetime)
+  
+  beeps[, `:=`(arrive_diff = data.table::shift(datetime, fill = NA, type = "lag"))]
+  beeps[, `:=`(depart_diff = data.table::shift(datetime, fill = NA, type = "lead"))]
+
+  beeps[, `:=`(arrive_diff = as.numeric(datetime - arrive_diff), depart_diff = as.numeric(depart_diff - datetime))]
+  set(beeps, j = "arrive", value = 0)
+  set(beeps, j = "depart", value = 0)
+  beeps[is.na(arrive_diff) | arrive_diff > thresh_sec, arrive := 1]
+  beeps[is.na(depart_diff) | depart_diff > thresh_sec, depart := 1]
+  beeps[, event := cumsum(arrive)]
+  out <- beeps[, .(start = min(datetime), end = max(datetime)), by = .(event)]
+
+  return(out)
+}
+
+
 
 #' @title calculates distance between glider and tag for all transmissions, identifies detections of transmissions
 #' @examples
@@ -642,7 +676,7 @@ glider_dtc <- function(dtc, receiver_site = c("cormorant", "mary_lou"), tag_beep
   glider_dtc <- dtc[receiver_mooring_type == "mobile" & receiver_site %in% receiver_site, c("datetime", "transmitter_instr_id", "receiver_site", "glider_lat_dd", "glider_lon_dd")]
 
   set(tag_beeps, j = "tran_dtc", value =  0)
-  tag_beeps[glider_dtc, ':=' (tran_dtc = 1, glider_lat = glider_lat_dd, glider_lon = glider_lon_dd, glider_dtc_time = datetime), on = .(transmitter_instr_id = transmitter_instr_id, datetime = datetime), roll = 3600]
+  tag_beeps[glider_dtc, ':=' (tran_dtc = 1, glider_lat = glider_lat_dd, glider_lon = glider_lon_dd, glider_dtc_time = datetime), on = .(transmitter_instr_id = transmitter_instr_id, datetime = datetime), roll = "nearest", rollends = c(FALSE, FALSE)]
 
   tag_beeps[, `:=`(glider_lon = approx(x = glider_geo$time[!is.na(glider_geo$lon_dd)],
                                        y = glider_geo$lon_dd[!is.na(glider_geo$lon_dd)],
@@ -659,38 +693,146 @@ glider_dtc <- function(dtc, receiver_site = c("cormorant", "mary_lou"), tag_beep
 }
 
 
+#' @title filter tag transmissions for periods of time when we have real-time data
+#' @examples
+#' tar_load("glider_dtc_transmissions")
+#' dtc = glider_dtc_transmissions
+#' tar_load(data_present)
+#' inter = data_present
+
+glider_dtc_transmissions_time_filtered <- function(dtc, inter){
+  foo <- inter[dtc, on = .(start <= datetime, end >= datetime)]
+  dtc[inter, `:=`(event = event), on = .(datetime >= start, datetime <= end)]
+  dtc <- dtc[!is.na(event)]
+  return(dtc)
+}
 
 
-## tar_load(glider_dtc_transmissions)
-## plot(tran_dtc ~ rt_distance_m, data = glider_dtc_transmissions[transmitter_instr_id == "A69-1604-32406" & trial == 1], xlim = c(0,3000), col = "red", pch = 16)
+################
 
-## unique(glider_dtc_transmissions$transmitter_instr_id)
+## tar_load("glider_dtc_range")
+## dtc <- glider_dtc_range[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651")]
 
-tar_load("glider_dtc_transmissions")
-dtc <- glider_dtc_transmissions[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & rt_distance_m < 3000]
-dtc[transmitter_freq == 180, col := "red"][transmitter_freq == 69, col := "black"] 
+## mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", k = 40, by = as.factor(transmitter_freq)), data = dtc, family = "binomial")
 
+## appraise(mod)
+## draw(mod)
+## dtc[, mod_fit := predict(mod, type = "response")]
+## gam.check(mod)
 
-
-mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", by = as.factor(transmitter_freq), k = 15), data = dtc, family = "binomial")
-
-dtc[, mod_fit := predict(mod, type = "response")]
-
-setkey(dtc, transmitter_freq, rt_distance_m)
-
-
-pdf("output/initial_range_curves.pdf")
-par(mfrow = c(2,1))
-plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 180], pch = 16, col = "black", main = "180 kHz", xlim = c(0,500), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
-lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 180], col = "red")
-
-plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69 kHz", xlim = c(0,3000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
-lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
-dev.off()
+## setkey(dtc, transmitter_freq, rt_distance_m)
+## plot(tran_dtc ~ rt_distance_m , data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69kHz", las = 1)
+## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
 
 
 
-gam.check(mod)
-plot.gam(mod)
 
-plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69])
+
+
+## https://fromthebottomoftheheap.net/2018/12/10/confidence-intervals-for-glms/
+## dtc[tran_dtc == 0, obs_col := "black"][tran_dtc == 1, obs_col := "red"]
+## new_data <- data.table(rt_distance_m = c(seq(from = min(dtc[transmitter_freq == 180, rt_distance_m]), max(dtc[transmitter_freq == 180, rt_distance_m]), length = 50), seq(min(dtc[transmitter_freq == 69, rt_distance_m]), max(dtc[transmitter_freq == 69, rt_distance_m]), length = 50)), transmitter_freq = rep(c(180, 69), each = 50))
+
+## new_data[, resp := predict(mod, newdata = new_data, type = "response")]
+
+setkey(new_data, transmitter_freq, rt_distance_m)
+
+
+## library(ggplot2)
+
+## ggplot(new_data, aes(x = rt_distance_m, y = resp, group = transmitter_freq, color = as.factor(transmitter_freq))) +
+##   geom_line() +
+##   geom_rug(data = dtc, aes(y = tran_dtc, color = obs_col))
+
+
+
+
+
+
+
+
+
+
+
+## mod1 <- gam(tran_dtc ~ s(as.numeric(datetime), bs = "cs", by = as.factor(transmitter_freq)), data = dtc, family = "binomial")
+## draw(mod1)
+## dtc[, mod_fit_tm := predict(mod, type = "response")]
+
+## setkey(dtc, transmitter_freq, datetime)
+## plot(tran_dtc ~ as.numeric(datetime), data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69kHz", las = 1)
+## lines(mod_fit_tm ~ as.numeric(datetime), data = dtc[transmitter_freq == 69], col = "red")
+
+
+
+## dtc[, event_freq := paste(event, transmitter_freq, sep="_")]
+
+## mod2 <- gam(tran_dtc ~ s(as.numeric(datetime), bs = "cs", by = as.factor(event_freq), k = 15), data = dtc, family = "binomial")
+## draw(mod2)
+## gam.check(mod2)
+
+
+## mod3 <- gam(tran_dtc ~ t2(rt_distance_m, as.numeric(datetime), bs = c("cs", "cs"), k = c(40, 12), by = as.factor(transmitter_freq)), data = dtc, family = "binomial")
+
+
+
+
+## plot(tran_dtc ~ as.factor(event), data = dtc[dtc$transmitter_freq == ""], ylim = c(0,0.2))
+
+## dtc[, .(.N), by = .(event, tran_dtc, transmitter_freq)] 
+## dtc[, .(.N), by = .(tran_dtc, transmitter_freq)]
+
+
+
+
+
+
+
+
+## setkey(dtc, transmitter_freq, rt_distance_m)
+
+
+## pdf("output/initial_range_curves.pdf")
+## par(mfrow = c(2,1))
+## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 180], pch = 16, col = "black", main = "180 kHz", xlim = c(0,500), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
+## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 180], col = "red")
+
+## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69 kHz", xlim = c(0,3000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
+## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
+## dev.off()
+
+
+## library(gratia)
+## draw(mod)
+## appraise(mod)
+
+
+
+
+## ####
+## pdf("output/initial_range_curves.pdf")
+## par(mfrow = c(6,1))
+## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_instr_id == "A69-1604-32402"], pch = 16, col = "black", main = "180 kHz", xlim = c(0,2000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
+## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_instr_id == "A69-1604-32402"], col = "red")
+
+## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69 kHz", xlim = c(0,3000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
+## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
+## dev.off()
+
+
+
+
+
+## gam.check(mod)
+## plot.gam(mod)
+
+## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69])
+
+
+
+## load_mgcv()
+## df <- data_sim("eg1", n = 1000, dist = "poisson", scale = 0.1, seed = 6)
+
+## # A poisson example
+## m <- gam(y ~ s(x0, bs = "cr") + s(x1, bs = "cr") + s(x2, bs = "cr") +
+##          s(x3, bs = "cr"), family = poisson(), data = df, method = "REML")
+## rootogram(m, plot = TRUE)
