@@ -87,12 +87,6 @@ list(
   ),
 
   tar_target(
-    recs,
-    "data/receiver_coords.fst",
-    format = "file"
-  ),
-
-  tar_target(
     vrl_data,
     "data/vrl/VRL",
     format = "file"
@@ -172,7 +166,31 @@ list(
    glider_dtc_range,
    glider_dtc_transmissions_time_filtered(dtc = glider_dtc_transmissions, inter = data_present),
    format = "fst_dt"
+ ),
+
+ tar_target( # GAM model of HB trial
+   GAMit_HB,
+   .GAMit(dtc = glider_dtc_range, trial = 1, limit_dist_m = 3000),
+   format = "rds"
+ ),
+
+ tar_target( # GAM model of SB trial
+   GAMit_SB,
+   .GAMit(dtc = glider_dtc_range, trial = 2, limit_dist_m = 3000),
+   format = "rds"
+ ),
+ 
+ tar_target( # model output for HB
+   mod_output_HB,
+   .mod_output(mod = GAMit_HB, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob_HB.pdf"),
+   format = "file"
+ ),
+
+ tar_target( # model output for SB
+   mod_output_SB,
+   .mod_output(mod = GAMit_SB, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob_SB.pdf"),
+   format = "file"
  )
-   
- )
+)
+
 
