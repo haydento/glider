@@ -707,13 +707,91 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
   return(dtc)
 }
 
+#' @title fit varying coefficient (on transmitter frequency) to stationary tag-glider detection data
+#' @examples
+#' tar_load("glider_dtc_range")
+#' dtc = glider_dtc_range
+#' limit_dist_m = 3000
+#' .GAMit(dtc = dtc, trial = 1, limit_dist_m = limit_dist_m)
 
-################
+.GAMit <- function(dtc = glider_dtc_range, trial = 1, limit_dist_m = 3000){
 
-## tar_load("glider_dtc_range")
-## dtc <- glider_dtc_range[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651")]
+  dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial & rt_distance_m <= limit_dist_m]
 
-## mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", k = 40, by = as.factor(transmitter_freq)), data = dtc, family = "binomial")
+  mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", k = 40, by = as.factor(transmitter_freq)), data = dtc.i, family = "binomial")
+
+  return(mod)
+}
+
+
+#' @title plot of predicted and observed over distance
+#' @examples
+#' tar_load("GAMit")
+#' mod  = GAMit
+#' tar_load("glider_dtc_range")
+#' dta <- glider_dtc_range
+ 
+.mod_output <- function(mod = GAMit, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob.pdf"){
+  dtc <- copy(dta)
+  dtc[tran_dtc == 0, obs_col := "black"][tran_dtc == 1, obs_col := "red"]
+
+  predicted_data <- data.table(rt_distance_m = c(seq(from = min(dtc[transmitter_freq == 180, rt_distance_m]), max(dtc[transmitter_freq == 180, rt_distance_m]), length = 500), seq(min(dtc[transmitter_freq == 69, rt_distance_m]), max(dtc[transmitter_freq == 69, rt_distance_m]), length = 500)), transmitter_freq = rep(c(180, 69), each = 500))
+
+  ilink <- family(mod)$linkinv
+  fit <-  predict(mod, newdata = predicted_data, se.fit = TRUE, type = "link")
+
+  predicted_data[, `:=`(fit_link = fit$fit, se_link = fit$se.fit)] 
+  predicted_data[, `:=`(fit_resp = ilink(fit_link), fit_upr = ilink(fit_link + (2 * se_link)), fit_lwr = ilink(fit_link - (2 * se_link)))]
+
+  setkey(predicted_data, transmitter_freq, rt_distance_m)
+
+  pdf(out_pth)
+  par(mfrow = c(1,2))
+
+  # plot 69 kHz
+  plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 69], type = "l", las = 1, ylim = c(0,1), main = "69 kHz", ylab = "detection probability (+-2SE)", xlab = "glider-receiver distance")
+
+  polygon(c(predicted_data[transmitter_freq == 69][["rt_distance_m"]], rev(predicted_data[transmitter_freq == 69][["rt_distance_m"]])),
+        c(predicted_data[transmitter_freq == 69][["fit_upr"]], rev(predicted_data[transmitter_freq == 69][["fit_lwr"]])), col = scales::alpha("black", 0.1), border = "black", lwd = 1.5 )
+
+  rug(dtc[transmitter_freq == 69 & tran_dtc == 0,][["rt_distance_m"]], side = 1, col = dtc[transmitter_freq == 69 & tran_dtc == 0,][["obs_col"]], ticksize = 0.02, lwd = 0.5)
+  rug(dtc[transmitter_freq == 69 & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc[transmitter_freq == 69 & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
+
+  # plot 180 kHz
+    plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 180], type = "l", las = 1, ylim = c(0,1), main = "180 kHz", ylab = "detection probability (+-2SE)", xlab = "glider-receiver distance")
+
+  polygon(c(predicted_data[transmitter_freq == 180][["rt_distance_m"]], rev(predicted_data[transmitter_freq == 180][["rt_distance_m"]])),
+        c(predicted_data[transmitter_freq == 180][["fit_upr"]], rev(predicted_data[transmitter_freq == 180][["fit_lwr"]])), col = scales::alpha("black", 0.1), border = "black", lwd = 1.5 )
+
+  rug(dtc[transmitter_freq == 180 & tran_dtc == 0,][["rt_distance_m"]], side = 1, col = dtc[transmitter_freq == 180 & tran_dtc == 0,][["obs_col"]], ticksize = 0.02, lwd = 0.5)
+  rug(dtc[transmitter_freq == 180 & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc[transmitter_freq == 180 & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
+
+  dev.off()
+  return(out_pth)
+  
+}
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 180], xlim = c(0,1000), pch = 16)
+## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], xlim = c(0,3000), pch = 16)
 
 ## appraise(mod)
 ## draw(mod)
@@ -725,17 +803,14 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
 ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
 
 
-
-
-
-
 ## https://fromthebottomoftheheap.net/2018/12/10/confidence-intervals-for-glms/
-## dtc[tran_dtc == 0, obs_col := "black"][tran_dtc == 1, obs_col := "red"]
-## new_data <- data.table(rt_distance_m = c(seq(from = min(dtc[transmitter_freq == 180, rt_distance_m]), max(dtc[transmitter_freq == 180, rt_distance_m]), length = 50), seq(min(dtc[transmitter_freq == 69, rt_distance_m]), max(dtc[transmitter_freq == 69, rt_distance_m]), length = 50)), transmitter_freq = rep(c(180, 69), each = 50))
 
-## new_data[, resp := predict(mod, newdata = new_data, type = "response")]
 
-setkey(new_data, transmitter_freq, rt_distance_m)
+
+
+#plot(resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 69], type = "l")
+
+
 
 
 ## library(ggplot2)
