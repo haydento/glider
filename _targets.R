@@ -170,25 +170,25 @@ list(
 
  tar_target( # GAM model of HB trial
    GAMit_HB,
-   .GAMit(dtc = glider_dtc_range, trial = 1, limit_dist_m = 3000),
+   .GAMit(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 2500),
    format = "rds"
  ),
 
  tar_target( # GAM model of SB trial
    GAMit_SB,
-   .GAMit(dtc = glider_dtc_range, trial = 2, limit_dist_m = 3000),
+   .GAMit(dtc = glider_dtc_range, trial_run = 2, limit_dist_m = 2500),
    format = "rds"
  ),
  
  tar_target( # model output for HB
    mod_output_HB,
-   .mod_output(mod = GAMit_HB, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob_HB.pdf"),
+   .mod_output(mod = GAMit_HB, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob_HB.pdf", limit_dist_m = 2500),
    format = "file"
  ),
 
  tar_target( # model output for SB
    mod_output_SB,
-   .mod_output(mod = GAMit_SB, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob_SB.pdf"),
+   .mod_output(mod = GAMit_SB, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob_SB.pdf", limit_dist_m = 2500),
    format = "file"
  )
 )

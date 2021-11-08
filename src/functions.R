@@ -637,23 +637,21 @@ impute_missing_transmissions <- function(dtc, hst){
 
 .data_present <- function(dtc, hst, thresh_sec = 86400){
   # find co-located receiver for mobile tag
-  tags <- hst[instr == "tag" & mooring_type == "mobile" & instr_model != "V5D-1x"]
-  recs <- hst[instr == "receiver" & mooring_type == "mobile", ]
-  tags[recs, `:=` (colocated_rec = i.instr_id), on = .(run_id, run, site, freq)] 
-
-  beeps <- dtc[tags, .(datetime, trial = receiver_run, transmitter_instr_id, transmitter_instr_model, transmitter_freq, transmitter_longitude, transmitter_latitude, receiver_site, receiver_instr_model, colocated_rec, tag_min_delay, tag_max_delay), on = .(receiver_run_id = run_id, receiver_serial_no = colocated_rec, transmitter_instr_id = instr_id), nomatch = NULL]
-setkey(beeps, datetime)
   
-  beeps[, `:=`(arrive_diff = data.table::shift(datetime, fill = NA, type = "lag"))]
-  beeps[, `:=`(depart_diff = data.table::shift(datetime, fill = NA, type = "lead"))]
+  beeps1 <- dtc[receiver_mooring_type == "mobile" & transmitter_mooring_type == "mobile" & transmitter_instr_model != "V5D-1x"]
+  setkey(beeps1, receiver_run, datetime)
+  
 
-  beeps[, `:=`(arrive_diff = as.numeric(datetime - arrive_diff), depart_diff = as.numeric(depart_diff - datetime))]
-  set(beeps, j = "arrive", value = 0)
-  set(beeps, j = "depart", value = 0)
-  beeps[is.na(arrive_diff) | arrive_diff > thresh_sec, arrive := 1]
-  beeps[is.na(depart_diff) | depart_diff > thresh_sec, depart := 1]
-  beeps[, event := cumsum(arrive)]
-  out <- beeps[, .(start = min(datetime), end = max(datetime)), by = .(event)]
+  beeps1[, `:=`(arrive_diff = data.table::shift(datetime, fill = NA, type = "lag"))]
+  beeps1[, `:=`(depart_diff = data.table::shift(datetime, fill = NA, type = "lead"))]
+
+  beeps1[, `:=`(arrive_diff = as.numeric(datetime - arrive_diff), depart_diff = as.numeric(depart_diff - datetime))]
+  set(beeps1, j = "arrive", value = 0)
+  set(beeps1, j = "depart", value = 0)
+  beeps1[is.na(arrive_diff) | arrive_diff > thresh_sec, arrive := 1]
+  beeps1[is.na(depart_diff) | depart_diff > thresh_sec, depart := 1]
+  beeps1[, event := cumsum(arrive)]
+  out <- beeps1[, .(start = min(datetime), end = max(datetime)), by = .(event)]
 
   return(out)
 }
@@ -712,11 +710,12 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
 #' tar_load("glider_dtc_range")
 #' dtc = glider_dtc_range
 #' limit_dist_m = 3000
-#' .GAMit(dtc = dtc, trial = 1, limit_dist_m = limit_dist_m)
+#' trial_run = 2
+#' .GAMit(dtc = dtc, trial_run = 1, limit_dist_m = limit_dist_m)
 
-.GAMit <- function(dtc = glider_dtc_range, trial = 1, limit_dist_m = 3000){
+.GAMit <- function(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 3000){
 
-  dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial & rt_distance_m <= limit_dist_m]
+  dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
 
   mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", k = 40, by = as.factor(transmitter_freq)), data = dtc.i, family = "binomial")
 
@@ -731,11 +730,11 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
 #' tar_load("glider_dtc_range")
 #' dta <- glider_dtc_range
  
-.mod_output <- function(mod = GAMit, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob.pdf"){
+.mod_output <- function(mod = GAMit, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob.pdf", limit_dist_m = 3000){
   dtc <- copy(dta)
   dtc[tran_dtc == 0, obs_col := "black"][tran_dtc == 1, obs_col := "red"]
 
-  predicted_data <- data.table(rt_distance_m = c(seq(from = min(dtc[transmitter_freq == 180, rt_distance_m]), max(dtc[transmitter_freq == 180, rt_distance_m]), length = 500), seq(min(dtc[transmitter_freq == 69, rt_distance_m]), max(dtc[transmitter_freq == 69, rt_distance_m]), length = 500)), transmitter_freq = rep(c(180, 69), each = 500))
+  predicted_data <- data.table(rt_distance_m = c(seq(from = min(dtc[transmitter_freq == 180 & rt_distance_m <= limit_dist_m, rt_distance_m]), max(dtc[transmitter_freq == 180 & rt_distance_m <= limit_dist_m, rt_distance_m]), length = 500), seq(min(dtc[transmitter_freq == 69 & rt_distance_m <= limit_dist_m, rt_distance_m]), max(dtc[transmitter_freq == 69 & rt_distance_m <= limit_dist_m, rt_distance_m]), length = 500)), transmitter_freq = rep(c(180, 69), each = 500))
 
   ilink <- family(mod)$linkinv
   fit <-  predict(mod, newdata = predicted_data, se.fit = TRUE, type = "link")
@@ -746,10 +745,10 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
   setkey(predicted_data, transmitter_freq, rt_distance_m)
 
   pdf(out_pth)
-  par(mfrow = c(1,2))
+  par(mfrow = c(2,1))
 
   # plot 69 kHz
-  plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 69], type = "l", las = 1, ylim = c(0,1), main = "69 kHz", ylab = "detection probability (+-2SE)", xlab = "glider-receiver distance")
+  plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 69], type = "l", las = 1, ylim = c(0,1), main = "69 kHz", ylab = "detection probability (+-2SE)", xlab = "glider-receiver distance", xlim = c(0, 2500))
 
   polygon(c(predicted_data[transmitter_freq == 69][["rt_distance_m"]], rev(predicted_data[transmitter_freq == 69][["rt_distance_m"]])),
         c(predicted_data[transmitter_freq == 69][["fit_upr"]], rev(predicted_data[transmitter_freq == 69][["fit_lwr"]])), col = scales::alpha("black", 0.1), border = "black", lwd = 1.5 )
@@ -758,7 +757,7 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
   rug(dtc[transmitter_freq == 69 & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc[transmitter_freq == 69 & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
 
   # plot 180 kHz
-    plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 180], type = "l", las = 1, ylim = c(0,1), main = "180 kHz", ylab = "detection probability (+-2SE)", xlab = "glider-receiver distance")
+    plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 180], type = "l", las = 1, ylim = c(0,1), main = "180 kHz", ylab = "detection probability (+-2SE)", xlab = "glider-receiver distance", xlim = c(0, 750))
 
   polygon(c(predicted_data[transmitter_freq == 180][["rt_distance_m"]], rev(predicted_data[transmitter_freq == 180][["rt_distance_m"]])),
         c(predicted_data[transmitter_freq == 180][["fit_upr"]], rev(predicted_data[transmitter_freq == 180][["fit_lwr"]])), col = scales::alpha("black", 0.1), border = "black", lwd = 1.5 )
@@ -772,142 +771,182 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
 }
   
 
+######################
+# exploratory analysis using tensor product model.  Should be able to predict detection probability for constant distance
+# and detection range curves for each day.
 
 
+#' @title fit varying coefficient (on transmitter frequency) to stationary tag-glider detection data
+#' @examples
+#' tar_load("glider_dtc_range")
+#' dtc = glider_dtc_range
+#' limit_dist_m = 2500
+#' trial_run = 1
+## library(mgcv)
+## range(dtc[trial == 2]$datetime)
+##    dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
 
+## ## mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", k = 40, by = as.factor(transmitter_freq)), data = dtc.i, family = "binomial")
+## dtc.i[, datetime := as.numeric(datetime)]
+## dtc.i[, transmitter_freq := as.factor(transmitter_freq)]
 
+## #mod1 <- gam(tran_dtc ~ s(datetime, bs = "cs", by = transmitter_freq), data = dtc.i, family = "binomial")
 
 
 
+## ## dtc.i[, ts := as.numeric(datetime)]
+## mod2 <- gam(tran_dtc ~ te(datetime, rt_distance_m, bs = c("cs", "cs"), by = as.factor(transmitter_freq)), data = dtc.i, family = "binomial")
 
 
+## new_data <- data.table(rt_distance_m = rep(c(1000,1000), each = 400), transmitter_freq = as.factor(rep(c(69, 180), each = 400)), datetime = rep(seq(from = min(dtc.i$datetime), to = max(dtc.i$datetime), length.out = 400), times = 2))
 
+## new_data[, pred := predict(mod2, newdata = new_data, type = "response")]
+## new_data[, datetime := as.POSIXct(datetime, tz = "UTC", origin = "1970-01-01 00:00:00")]
 
 
+## plot(pred ~ datetime, data = new_data[transmitter_freq == 69,], type = "o",  ylim = c(0,1), xaxt = "n")
+## axis.POSIXct(1, at = seq(min(new_data$datetime), max(new_data$datetime), "1 day"), format = "%Y-%m-%d")
+## plot(pred ~ datetime, data = new_data[transmitter_freq == 180,], type = "o", ylim = c(0,1), xaxt = "n")
+## axis.POSIXct(1, at = seq(min(new_data$datetime), max(new_data$datetime), "1 day"), format = "%Y-%m-%d")
 
 
 
+# JUNK BELOW TO END
 
-
-
-## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 180], xlim = c(0,1000), pch = 16)
-## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], xlim = c(0,3000), pch = 16)
-
-## appraise(mod)
-## draw(mod)
-## dtc[, mod_fit := predict(mod, type = "response")]
-## gam.check(mod)
-
-## setkey(dtc, transmitter_freq, rt_distance_m)
-## plot(tran_dtc ~ rt_distance_m , data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69kHz", las = 1)
-## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
-
-
-## https://fromthebottomoftheheap.net/2018/12/10/confidence-intervals-for-glms/
-
-
-
-
-#plot(resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 69], type = "l")
-
-
-
-
-## library(ggplot2)
-
-## ggplot(new_data, aes(x = rt_distance_m, y = resp, group = transmitter_freq, color = as.factor(transmitter_freq))) +
-##   geom_line() +
-##   geom_rug(data = dtc, aes(y = tran_dtc, color = obs_col))
-
-
-
-
-
-
-
-
-
-
-
-## mod1 <- gam(tran_dtc ~ s(as.numeric(datetime), bs = "cs", by = as.factor(transmitter_freq)), data = dtc, family = "binomial")
-## draw(mod1)
-## dtc[, mod_fit_tm := predict(mod, type = "response")]
-
-## setkey(dtc, transmitter_freq, datetime)
-## plot(tran_dtc ~ as.numeric(datetime), data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69kHz", las = 1)
-## lines(mod_fit_tm ~ as.numeric(datetime), data = dtc[transmitter_freq == 69], col = "red")
-
-
-
-## dtc[, event_freq := paste(event, transmitter_freq, sep="_")]
-
-## mod2 <- gam(tran_dtc ~ s(as.numeric(datetime), bs = "cs", by = as.factor(event_freq), k = 15), data = dtc, family = "binomial")
-## draw(mod2)
-## gam.check(mod2)
-
-
-## mod3 <- gam(tran_dtc ~ t2(rt_distance_m, as.numeric(datetime), bs = c("cs", "cs"), k = c(40, 12), by = as.factor(transmitter_freq)), data = dtc, family = "binomial")
-
-
-
-
-## plot(tran_dtc ~ as.factor(event), data = dtc[dtc$transmitter_freq == ""], ylim = c(0,0.2))
-
-## dtc[, .(.N), by = .(event, tran_dtc, transmitter_freq)] 
-## dtc[, .(.N), by = .(tran_dtc, transmitter_freq)]
-
-
-
-
-
-
-
-
-## setkey(dtc, transmitter_freq, rt_distance_m)
-
-
-## pdf("output/initial_range_curves.pdf")
-## par(mfrow = c(2,1))
-## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 180], pch = 16, col = "black", main = "180 kHz", xlim = c(0,500), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
-## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 180], col = "red")
-
-## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69 kHz", xlim = c(0,3000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
-## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
-## dev.off()
-
+## vis.gam(mod2, view = c("rt_distance_m", "datetime"), cond = list(transmitter_freq = 69), type = "response", zlim = c(0,1), xlim = c(0, 2500), n.grid = 200)
+## vis.gam(mod2, view = c("rt_distance_m"), con = list(transmitter_freq = 69), type = "response", zlim = c(0,1), xlim = c(0,2500))
+## vis.gam(mod5)
 
 ## library(gratia)
-## draw(mod)
-## appraise(mod)
+## draw(mod2)
 
-
-
-
-## ####
-## pdf("output/initial_range_curves.pdf")
-## par(mfrow = c(6,1))
-## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_instr_id == "A69-1604-32402"], pch = 16, col = "black", main = "180 kHz", xlim = c(0,2000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
-## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_instr_id == "A69-1604-32402"], col = "red")
-
-## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69 kHz", xlim = c(0,3000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
-## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
-## dev.off()
+## test <- predict(mod2, type = "response")
+## dtc.i[, pred := predict(mod2, type = "response")]
+## range(dtc.i[transmitter_freq == 69][["pred"]])
 
 
 
 
 
-## gam.check(mod)
-## plot.gam(mod)
-
-## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69])
+## ## dtc.i[, mod2_fit := predict(mod2, type = "response")]
 
 
 
-## load_mgcv()
-## df <- data_sim("eg1", n = 1000, dist = "poisson", scale = 0.1, seed = 6)
 
-## # A poisson example
-## m <- gam(y ~ s(x0, bs = "cr") + s(x1, bs = "cr") + s(x2, bs = "cr") +
-##          s(x3, bs = "cr"), family = poisson(), data = df, method = "REML")
-## rootogram(m, plot = TRUE)
+## ## setkey(dtc.i, transmitter_freq, datetime)
+## ## plot(mod2_fit ~ rt_distance_m, data = dtc.i[transmitter_freq == 180], pch = 16, col = "red", type = "o") 
+## ## plot(mod2_fit ~ as.numeric(datetime), data = dtc.i[transmitter_freq == 69], col = "red", type = "o")
+
+
+## ## plot(mod1)
+
+
+## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 180], xlim = c(0,1000), pch = 16)
+## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], xlim = c(0,3000), pch = 16)
+
+## ## appraise(mod)
+## ## draw(mod)
+## ## dtc[, mod_fit := predict(mod, type = "response")]
+## ## gam.check(mod)
+
+## ## setkey(dtc, transmitter_freq, rt_distance_m)
+## ## plot(tran_dtc ~ rt_distance_m , data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69kHz", las = 1)
+## ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
+
+
+## ## https://fromthebottomoftheheap.net/2018/12/10/confidence-intervals-for-glms/
+
+
+
+
+## #plot(resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 69], type = "l")
+
+## ## library(ggplot2)
+
+## ## ggplot(new_data, aes(x = rt_distance_m, y = resp, group = transmitter_freq, color = as.factor(transmitter_freq))) +
+## ##   geom_line() +
+## ##   geom_rug(data = dtc, aes(y = tran_dtc, color = obs_col))
+
+
+## ## mod1 <- gam(tran_dtc ~ s(as.numeric(datetime), bs = "cs", by = as.factor(transmitter_freq)), data = dtc, family = "binomial")
+## ## draw(mod1)
+## ## dtc[, mod_fit_tm := predict(mod, type = "response")]
+
+## ## setkey(dtc, transmitter_freq, datetime)
+## ## plot(tran_dtc ~ as.numeric(datetime), data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69kHz", las = 1)
+## ## lines(mod_fit_tm ~ as.numeric(datetime), data = dtc[transmitter_freq == 69], col = "red")
+
+
+
+## ## dtc[, event_freq := paste(event, transmitter_freq, sep="_")]
+
+## ## mod2 <- gam(tran_dtc ~ s(as.numeric(datetime), bs = "cs", by = as.factor(event_freq), k = 15), data = dtc, family = "binomial")
+## ## draw(mod2)
+## ## gam.check(mod2)
+
+
+## ## mod3 <- gam(tran_dtc ~ t2(rt_distance_m, as.numeric(datetime), bs = c("cs", "cs"), k = c(40, 12), by = as.factor(transmitter_freq)), data = dtc, family = "binomial")
+
+
+
+
+## ## plot(tran_dtc ~ as.factor(event), data = dtc[dtc$transmitter_freq == ""], ylim = c(0,0.2))
+
+## ## dtc[, .(.N), by = .(event, tran_dtc, transmitter_freq)] 
+## ## dtc[, .(.N), by = .(tran_dtc, transmitter_freq)]
+
+
+
+
+
+
+
+
+## ## setkey(dtc, transmitter_freq, rt_distance_m)
+
+
+## ## pdf("output/initial_range_curves.pdf")
+## ## par(mfrow = c(2,1))
+## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 180], pch = 16, col = "black", main = "180 kHz", xlim = c(0,500), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
+## ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 180], col = "red")
+
+## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69 kHz", xlim = c(0,3000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
+## ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
+## ## dev.off()
+
+
+## ## library(gratia)
+## ## draw(mod)
+## ## appraise(mod)
+
+
+
+
+## ## ####
+## ## pdf("output/initial_range_curves.pdf")
+## ## par(mfrow = c(6,1))
+## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_instr_id == "A69-1604-32402"], pch = 16, col = "black", main = "180 kHz", xlim = c(0,2000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
+## ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_instr_id == "A69-1604-32402"], col = "red")
+
+## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69 kHz", xlim = c(0,3000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
+## ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
+## ## dev.off()
+
+
+
+
+
+## ## gam.check(mod)
+## ## plot.gam(mod)
+
+## ## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69])
+
+
+
+## ## load_mgcv()
+## ## df <- data_sim("eg1", n = 1000, dist = "poisson", scale = 0.1, seed = 6)
+
+## ## # A poisson example
+## ## m <- gam(y ~ s(x0, bs = "cr") + s(x1, bs = "cr") + s(x2, bs = "cr") +
+## ##          s(x3, bs = "cr"), family = poisson(), data = df, method = "REML")
+## ## rootogram(m, plot = TRUE)
