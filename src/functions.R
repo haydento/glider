@@ -772,6 +772,75 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
   
 
 ######################
+#' tar_load(vrl_vem_combined_dtc)
+#' tar_load(hst)
+
+## # copy dtc
+## dtc <- copy(vrl_vem_combined_dtc)
+
+## # range(vrl_vem_combined_dtc$datetime)
+## tseq <- seq(from = lubridate::floor_date(min(vrl_vem_combined_dtc$datetime), unit = "day"), to = lubridate::ceiling_date(max(vrl_vem_combined_dtc$datetime), unit = "day"), by = 60*60*8)
+
+## # bin detections
+## dtc[, tbin := tseq[findInterval(datetime, tseq)]]
+
+## # extract all tags
+## tags <- hst[ instr == "tag", "instr_id"]
+## recs <- hst[instr == "receiver", "instr_id"]
+## trial = c(1,2)
+
+
+## all_tag_recs <- CJ(tag_id = tags$instr_id, rec_id = recs$instr_id, run = trial, tbin = tseq, tran_dtc = 0)
+
+## # count number of detections of each tag in each bin on each receiver and run
+## dtc_obs <- dtc[, .(num_dtc = .N, mean_rt_dist = mean(rt_distance_meters) ), by = .(receiver_run, transmitter_instr_id, tbin, receiver_serial_no, receiver_frequency )]
+
+## # join with all tag-receiver combinations
+
+
+##########################
+#' tar_load(vrl_vem_combined_dtc)
+#' dtc <- vrl_vem_combined_dtc
+#' tar_load(hst)
+#' trial = 2
+#' out_pth = "output/rec_abacus_SB.pdf"
+#' receiver_abacus(dtc = dtc, hst = hst, trial = 1, main = "Hammond Bay receiver detections", out_pth = out_pth)
+
+receiver_abacus <- function(dtc, hst, trial, out_pth, ...){
+
+  dtc <- dtc[receiver_run == trial,]
+  hst <- hst[run == trial,]
+  set(dtc, j = "receiver_serial_no_fac", value = as.factor(dtc$receiver_serial_no))
+
+  trial_start <- max(hst[][["timestamp_start_utc"]])
+  trial_end <- min(hst[][["timestamp_end_utc"]])
+
+  tseries <- seq(lubridate::floor_date(trial_start, "day"), lubridate::ceiling_date(trial_end, "day"), by = "day")
+  dtc[, label := as.factor(paste(receiver_instr_model, receiver_serial_no, receiver_freq, sep = ","))]
+
+  pdf(out_pth)
+  par(mar = c(4,10,3,2), oma = c(0,1,0,0))
+  plot(as.numeric(label) ~ datetime, data = dtc, axes = FALSE, col = "red", pch = 16, xlab = "time", ylab = NA, xlim = c(trial_start, trial_end), ...)
+  axis.POSIXct(1, x = tseries, format = "%Y-%m-%d")
+  axis(2, at = unique(dtc$receiver_serial_no_fac), labels = levels(dtc$label), las = 1)
+  box()
+  mtext("receiver model, serial no, frequency", outer = TRUE, side = 2, line = -1)
+  dev.off()
+  
+  return(out_pth)
+}
+
+
+
+
+
+
+
+
+
+
+
+
 # exploratory analysis using tensor product model.  Should be able to predict detection probability for constant distance
 # and detection range curves for each day.
 

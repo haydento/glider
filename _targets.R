@@ -190,7 +190,21 @@ list(
    mod_output_SB,
    .mod_output(mod = GAMit_SB, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob_SB.pdf", limit_dist_m = 2500),
    format = "file"
+ ),
+
+ tar_target( # receiver abacus for HB
+   receiver_abacus_HB,
+   receiver_abacus(dtc = vrl_vem_combined_dtc, hst = hst, trial = 1, out_pth = "output/rec_abacus_HB.pdf", main = "Hammond Bay receiver detections"),
+   format = "file"
+ ),
+
+ tar_target( # receiver abacus for SB
+   receiver_abacus_SB,
+   receiver_abacus(dtc = vrl_vem_combined_dtc, hst = hst, trial = 2, out_pth = "output/rec_abacus_SB.pdf", main = "Saginaw Bay receiver detections"),
+   format = "file"
  )
+ 
+ 
 )
 
 
