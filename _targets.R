@@ -144,7 +144,7 @@ list(
   # determine times when we have real-time data in hand
   tar_target(
     data_present,
-    .data_present(dtc = vrl_vem_combined_dtc, hst = hst, thresh_sec = (3600*24)),
+    .data_present(dtc = vrl_vem_combined_dtc, hst = hst, thresh_sec = (3600*12)),
     format = "fst_dt"
     ),
 
@@ -164,7 +164,7 @@ list(
 
  tar_target(
    glider_dtc_range,
-   glider_dtc_transmissions_time_filtered(dtc = glider_dtc_transmissions, inter = data_present),
+   glider_dtc_transmissions_time_filtered(dtc = glider_dtc_transmissions, inter = data_bounds),
    format = "fst_dt"
  ),
 
@@ -182,29 +182,76 @@ list(
  
  tar_target( # model output for HB
    mod_output_HB,
-   .mod_output(mod = GAMit_HB, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob_HB.pdf", limit_dist_m = 2500),
+   .mod_output(mod = GAMit_HB, dtc = glider_dtc_range, out_pth = "output/predicted_dtc_prob_HB.pdf", limit_dist_m = 2500, text = "Hammond Bay", trial_run = 1),
    format = "file"
  ),
 
  tar_target( # model output for SB
    mod_output_SB,
-   .mod_output(mod = GAMit_SB, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob_SB.pdf", limit_dist_m = 2500),
+   .mod_output(mod = GAMit_SB, dtc = glider_dtc_range, out_pth = "output/predicted_dtc_prob_SB.pdf", limit_dist_m = 2500, text = "Saginaw Bay", trial_run = 2),
    format = "file"
  ),
 
  tar_target( # receiver abacus for HB
    receiver_abacus_HB,
-   receiver_abacus(dtc = vrl_vem_combined_dtc, hst = hst, trial = 1, out_pth = "output/rec_abacus_HB.pdf", main = "Hammond Bay receiver detections"),
+   receiver_abacus(dtc = vrl_vem_combined_dtc, hst = hst, trial = 1, out_pth = "output/rec_abacus_HB.pdf", main = "Hammond Bay receiver detections", bounds = data_present),
    format = "file"
  ),
 
  tar_target( # receiver abacus for SB
    receiver_abacus_SB,
-   receiver_abacus(dtc = vrl_vem_combined_dtc, hst = hst, trial = 2, out_pth = "output/rec_abacus_SB.pdf", main = "Saginaw Bay receiver detections"),
+   receiver_abacus(dtc = vrl_vem_combined_dtc, hst = hst, trial = 2, out_pth = "output/rec_abacus_SB.pdf", main = "Saginaw Bay receiver detections", bounds = data_present),
    format = "file"
- )
- 
- 
+ ),
+
+ tar_target(
+   discrete_dtc_prob,
+   .discrete_dtc_prob(gear_log = hst, dta = vrl_vem_combined_dtc, bsize = 3600, glider_geo = glider_trk, bounds = data_bounds),
+   format = "fst_dt"
+ ),
+
+ tar_target(
+   discrete_HB,
+   discrete_rng_crv(dtc = discrete_dtc_prob, trial = 1, out_pth = "output/discrete_HB_69kHz.pdf", main = "Hammond Bay, 69kHz"),
+   format = "file"
+ ),
+
+ tar_target(
+   discrete_SB,
+   discrete_rng_crv(dtc = discrete_dtc_prob, trial = 2, out_pth = "output/discrete_SB_69kHz.pdf", main = "Saginaw Bay, 69kHz"),
+   format = "file"
+ ),
+
+ tar_target(
+   mission_data_summary,
+   file_abacus(dtc = clean_mission, out_pth = "output/mission_data_operating.pdf"),
+   format = "file"
+ ),
+
+ tar_target(
+   science_data_summary,
+   file_abacus(dtc = clean_sci, out_pth = "output/science_data_operating.pdf"),
+   format = "file"
+ ),
+
+ tar_target(
+   data_bounds,
+   .data_bounds(dtc = clean_mission),
+   format = "fst_dt"
+ ),
+
+ tar_target(
+   GAMit_tensor_SB,
+   .GAMit_tensor(dtc = glider_dtc_range, trial_run = 2, limit_dist_m = 3000),
+   format = "rds"
+ ),
+
+ tar_target(
+   GAMit_tensor_HB,
+   .GAMit_tensor(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 3000),
+   format = "rds"
+   )
+  
 )
 
 

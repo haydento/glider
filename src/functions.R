@@ -128,7 +128,7 @@ trial_parser <- function(pth = glider_trial){
 
 
 #' @title cleans up and formats science and mission data files
-#' @description removes 2nd line of header, sets time column to POSIX, and convert lat/lon to decimal degrees
+#' @description removes 2nd line of header, sets time column to POSIX, and convert lat/lon to decimal degrees, adds file start and end timestamp columns
 #' @param pth file path to mission or science data offload
 #' @param lat column in file containing latitude
 #' @param lon column in file containing longitude values
@@ -140,11 +140,11 @@ trial_parser <- function(pth = glider_trial){
 #'
 #' #multiple files
 #' tar_load("sci_data")
-#' pth_files = sci_data
+#' pth = sci_data
 #' tar_load("hst")
 #' trial = hst
 #' 
-#' tst <- clean(pth = mission_data, lat = m_gps_lat, lon = m_gps_lon)
+#' clean(pth = sci_data, lat = m_gps_lat, lon = m_gps_lon)
 
 
 clean <- function(pth, lat = m_pth_lat, lon = m_gps_lon, trial = hst){
@@ -157,8 +157,8 @@ clean <- function(pth, lat = m_pth_lat, lon = m_gps_lon, trial = hst){
 
   # bring in all files and drop the second row
   dta <- lapply(pth, function(x){data.table::fread(x, na.strings = "NaN")[-1]})
-  dta <- data.table::rbindlist(dta, fill = TRUE)
-
+  dta <- data.table::rbindlist(dta, fill = TRUE, idcol = "file_num")
+  
   # convert all columns from character to numeric
   dta[, names(dta) := lapply(.SD, as.numeric)]
   data.table::set(dta, j="time", 
@@ -167,6 +167,10 @@ clean <- function(pth, lat = m_pth_lat, lon = m_gps_lon, trial = hst){
                                      tz = "UTC"))
   dta[, lat_dd := to_dd(m_gps_lat)]
   dta[, lon_dd := to_dd(m_gps_lon)]
+
+  dta[, start_time := min(time), by = .(file_num)]
+  dta[, end_time := max(time), by = .(file_num)]
+  
   
   return(dta[])
 
@@ -717,24 +721,104 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
 
   dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
 
-  mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", k = 40, by = as.factor(transmitter_freq)), data = dtc.i, family = "binomial")
+  mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", by = as.factor(transmitter_instr_model)), data = dtc.i, family = "binomial")
 
   return(mod)
 }
 
 
+#' @title fit varying coefficient (on transmitter frequency) to stationary tag-glider detection data
+#' @examples
+#' tar_load("glider_dtc_range")
+#' dtc = glider_dtc_range
+#' limit_dist_m = 3000
+#' trial_run = 2
+#' .GAMit_tensor(dtc = dtc, trial_run = 1, limit_dist_m = limit_dist_m)
+
+.GAMit_tensor <- function(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 3000){
+
+  dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
+
+mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(transmitter_instr_model)), data = dtc.i, family = "binomial")
+
+  return(mod)
+}
+
+## .mod_output_te <- function(mod = GAMit_tensor, dtc = glider_dtc_range, out_pth = "output/predicted_dtc_prob.pdf", limit_dist_m = 2500, trial_run = 1, ...) {
+
+##   dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
+##   predicted_data = dtc.i[, c("datetime", "rt_distance_m", "transmitter_instr_model")]
+##   predicted_data[, datetime := as.numeric(datetime)]
+##   predicted_data[, transmitter_instr_model := as.factor(transmitter_instr_model)]
+
+  
+##   ilink <- family(mod)$linkinv
+##   fit <-  predict(mod, newdata = predicted_data, se.fit = TRUE, type = "link")
+
+##   predicted_data[, `:=`(fit_link = fit$fit, se_link = fit$se.fit)] 
+##   predicted_data[, `:=`(fit_resp = ilink(fit_link), fit_upr = ilink(fit_link + (2 * se_link)), fit_lwr = ilink(fit_link - (2 * se_link)))]
+
+##   setkey(predicted_data, transmitter_instr_model, rt_distance_m)
+
+##   pdf(out_pth)
+##   par(mfrow = c(2,1), oma = c(0,0,2,0), mar = c(4,4,0,0))
+
+##   # plot 69 kHz
+##   plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_instr_model %in% c("V13-1x-H")], type = "l", las = 1, ylim = c(0,1), ylab = "dtc prob (+-2SE)", xlim = c(0, 2500), col = "blue")
+##   lines(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_instr_model %in% c("V13-1x-L")], col = "red")
+
+##   # V13-H error
+##   polygon(c(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["rt_distance_m"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["rt_distance_m"]])),
+##         c(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["fit_lwr"]])), col = scales::alpha("blue", 0.1), border = "blue", lwd = 1.5 )
+
+##   #V13-L error
+##   polygon(c(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["rt_distance_m"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["rt_distance_m"]])),
+##         c(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["fit_lwr"]])), col = scales::alpha("blue", 0.1), border = "red", lwd = 1.5 )
+
+##     rug(dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc == 0,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc == 0,][["obs_col"]], ticksize = 0.02, lwd = 0.5)
+##   rug(dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
+
+##   legend("topright", lty = c(1,1), col = c("blue", "red"), legend = c("V13-1x-H", "V13-1x-L"))
+
+##   # plot 180 kHz
+##   plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_instr_model %in% c("V9-2x-180K")], type = "l", las = 1, ylim = c(0,1), ylab = "dtc prob (+-2SE)", xlab = "glider-tag distance", xlim = c(0, 2500), col = "blue")
+  
+##   polygon(c(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["rt_distance_m"]], rev(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["rt_distance_m"]])),
+##         c(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["fit_lwr"]])), col = scales::alpha("blue", 0.1), border = "blue", lwd = 1.5 )
+
+
+##     rug(dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc == 0,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc == 0,][["obs_col"]], ticksize = 0.02, lwd = 0.5)
+##   rug(dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
+
+##   legend("topright", lty = c(1,1), col = c("blue"), legend = c("V9-2x-180K"))
+
+##   mtext(..., side = 3, outer = TRUE, line = 0)
+  
+##   dev.off()
+##   return(out_pth)
+  
+## }
+
+  
+  
+
 #' @title plot of predicted and observed over distance
 #' @examples
-#' tar_load("GAMit")
-#' mod  = GAMit
+#' tar_load("GAMit_SB")
+#' mod  = GAMit_SB
 #' tar_load("glider_dtc_range")
-#' dta <- glider_dtc_range
- 
-.mod_output <- function(mod = GAMit, dta = glider_dtc_range, out_pth = "output/predicted_dtc_prob.pdf", limit_dist_m = 3000){
-  dtc <- copy(dta)
-  dtc[tran_dtc == 0, obs_col := "black"][tran_dtc == 1, obs_col := "red"]
+#' dtc <- glider_dtc_range
 
-  predicted_data <- data.table(rt_distance_m = c(seq(from = min(dtc[transmitter_freq == 180 & rt_distance_m <= limit_dist_m, rt_distance_m]), max(dtc[transmitter_freq == 180 & rt_distance_m <= limit_dist_m, rt_distance_m]), length = 500), seq(min(dtc[transmitter_freq == 69 & rt_distance_m <= limit_dist_m, rt_distance_m]), max(dtc[transmitter_freq == 69 & rt_distance_m <= limit_dist_m, rt_distance_m]), length = 500)), transmitter_freq = rep(c(180, 69), each = 500))
+#' limit_dist_m = 3000
+ 
+.mod_output <- function(mod = GAMit, dtc = glider_dtc_range, out_pth = "output/predicted_dtc_prob.pdf", limit_dist_m = 2500, trial_run = 1, ...){
+
+  dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
+
+  dtc.i[tran_dtc == 0, obs_col := "black"][tran_dtc == 1, obs_col := "red"]
+  rt_distance_m = seq(min(dtc.i$rt_distance_m, na.rm = TRUE), limit_dist_m, length.out = 500)
+  
+  predicted_data <- CJ(transmitter_instr_model = unique(dtc.i$transmitter_instr_model), rt_distance_m = rt_distance_m)
 
   ilink <- family(mod)$linkinv
   fit <-  predict(mod, newdata = predicted_data, se.fit = TRUE, type = "link")
@@ -742,29 +826,42 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
   predicted_data[, `:=`(fit_link = fit$fit, se_link = fit$se.fit)] 
   predicted_data[, `:=`(fit_resp = ilink(fit_link), fit_upr = ilink(fit_link + (2 * se_link)), fit_lwr = ilink(fit_link - (2 * se_link)))]
 
-  setkey(predicted_data, transmitter_freq, rt_distance_m)
+  setkey(predicted_data, transmitter_instr_model, rt_distance_m)
 
   pdf(out_pth)
-  par(mfrow = c(2,1))
+  par(mfrow = c(2,1), oma = c(0,0,2,0), mar = c(4,4,0,0))
 
   # plot 69 kHz
-  plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 69], type = "l", las = 1, ylim = c(0,1), main = "69 kHz", ylab = "detection probability (+-2SE)", xlab = "glider-receiver distance", xlim = c(0, 2500))
+  plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_instr_model %in% c("V13-1x-H")], type = "l", las = 1, ylim = c(0,1), ylab = "dtc prob (+-2SE)", xlim = c(0, 2500), col = "blue")
+  lines(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_instr_model %in% c("V13-1x-L")], col = "red")
 
-  polygon(c(predicted_data[transmitter_freq == 69][["rt_distance_m"]], rev(predicted_data[transmitter_freq == 69][["rt_distance_m"]])),
-        c(predicted_data[transmitter_freq == 69][["fit_upr"]], rev(predicted_data[transmitter_freq == 69][["fit_lwr"]])), col = scales::alpha("black", 0.1), border = "black", lwd = 1.5 )
+  # V13-H error
+  polygon(c(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["rt_distance_m"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["rt_distance_m"]])),
+        c(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["fit_lwr"]])), col = scales::alpha("blue", 0.1), border = "blue", lwd = 1.5 )
 
-  rug(dtc[transmitter_freq == 69 & tran_dtc == 0,][["rt_distance_m"]], side = 1, col = dtc[transmitter_freq == 69 & tran_dtc == 0,][["obs_col"]], ticksize = 0.02, lwd = 0.5)
-  rug(dtc[transmitter_freq == 69 & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc[transmitter_freq == 69 & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
+  #V13-L error
+  polygon(c(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["rt_distance_m"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["rt_distance_m"]])),
+        c(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["fit_lwr"]])), col = scales::alpha("blue", 0.1), border = "red", lwd = 1.5 )
+
+    rug(dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc == 0,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc == 0,][["obs_col"]], ticksize = 0.02, lwd = 0.5)
+  rug(dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
+
+  legend("topright", lty = c(1,1), col = c("blue", "red"), legend = c("V13-1x-H", "V13-1x-L"))
 
   # plot 180 kHz
-    plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 180], type = "l", las = 1, ylim = c(0,1), main = "180 kHz", ylab = "detection probability (+-2SE)", xlab = "glider-receiver distance", xlim = c(0, 750))
+  plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_instr_model %in% c("V9-2x-180K")], type = "l", las = 1, ylim = c(0,1), ylab = "dtc prob (+-2SE)", xlab = "glider-tag distance", xlim = c(0, 2500), col = "blue")
+  
+  polygon(c(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["rt_distance_m"]], rev(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["rt_distance_m"]])),
+        c(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["fit_lwr"]])), col = scales::alpha("blue", 0.1), border = "blue", lwd = 1.5 )
 
-  polygon(c(predicted_data[transmitter_freq == 180][["rt_distance_m"]], rev(predicted_data[transmitter_freq == 180][["rt_distance_m"]])),
-        c(predicted_data[transmitter_freq == 180][["fit_upr"]], rev(predicted_data[transmitter_freq == 180][["fit_lwr"]])), col = scales::alpha("black", 0.1), border = "black", lwd = 1.5 )
 
-  rug(dtc[transmitter_freq == 180 & tran_dtc == 0,][["rt_distance_m"]], side = 1, col = dtc[transmitter_freq == 180 & tran_dtc == 0,][["obs_col"]], ticksize = 0.02, lwd = 0.5)
-  rug(dtc[transmitter_freq == 180 & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc[transmitter_freq == 180 & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
+    rug(dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc == 0,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc == 0,][["obs_col"]], ticksize = 0.02, lwd = 0.5)
+  rug(dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
 
+  legend("topright", lty = c(1,1), col = c("blue"), legend = c("V9-2x-180K"))
+
+  mtext(..., side = 3, outer = TRUE, line = 0)
+  
   dev.off()
   return(out_pth)
   
@@ -772,30 +869,118 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
   
 
 ######################
-#' tar_load(vrl_vem_combined_dtc)
+#' tar_load(glider_trk)
+#' glider_geo <- glider_trk  
 #' tar_load(hst)
-
-## # copy dtc
-## dtc <- copy(vrl_vem_combined_dtc)
-
-## # range(vrl_vem_combined_dtc$datetime)
-## tseq <- seq(from = lubridate::floor_date(min(vrl_vem_combined_dtc$datetime), unit = "day"), to = lubridate::ceiling_date(max(vrl_vem_combined_dtc$datetime), unit = "day"), by = 60*60*8)
-
-## # bin detections
-## dtc[, tbin := tseq[findInterval(datetime, tseq)]]
-
-## # extract all tags
-## tags <- hst[ instr == "tag", "instr_id"]
-## recs <- hst[instr == "receiver", "instr_id"]
-## trial = c(1,2)
+#' gear_log = hst
+#' tar_load(vrl_vem_combined_dtc)
+#' dta = vrl_vem_combined_dtc
+#' bsize = 3600
+#' tar_load(data_bounds)
+#' bounds = data_bounds
 
 
-## all_tag_recs <- CJ(tag_id = tags$instr_id, rec_id = recs$instr_id, run = trial, tbin = tseq, tran_dtc = 0)
+.discrete_dtc_prob <- function(gear_log = hst, dta = vrl_vem_combined, bsize = 3600, glider_geo, bounds ){
 
-## # count number of detections of each tag in each bin on each receiver and run
-## dtc_obs <- dtc[, .(num_dtc = .N, mean_rt_dist = mean(rt_distance_meters) ), by = .(receiver_run, transmitter_instr_id, tbin, receiver_serial_no, receiver_frequency )]
+  # copy hst
+  hst1 <- copy(gear_log)
+  set(hst1, j = "freq", value = as.character(hst1$freq))
 
-## # join with all tag-receiver combinations
+  # copy dtc
+  dtc <- copy(dta)
+
+  # range(vrl_vem_combined_dtc$datetime)
+  tseq <- seq(from = lubridate::floor_date(min(dta$datetime), unit = "day"), to = lubridate::ceiling_date(max(dta$datetime), unit = "day"), by = bsize)
+
+  # bin detections
+  dtc[, tbin := tseq[findInterval(datetime, tseq)]]
+
+  # extract all tag, receiver, and trial ids
+  tags <- hst1[ instr == "tag", "instr_id"]
+  recs <- hst1[instr == "receiver", "instr_id"]
+  trial = unique(hst1$run)
+
+  # create all combinations of tag, receiver, and trials. Not all of these combinations are possible but will sort that out later.
+  tag_rec_comb <- CJ(transmitter_instr_id = unique(tags$instr_id), receiver_serial_no = unique(recs$instr_id), receiver_run = unique(trial), tbin = tseq, tran_dtc = 0, unique = TRUE)
+
+  # count number of detections of each tag in each bin on each receiver and run
+  dtc_obs <- dtc[, .(num_dtc = .N, mean_rt_dist = mean(rt_distance_meters) ), by = .(receiver_run, transmitter_instr_id, tbin, receiver_serial_no, receiver_frequency )]
+
+  # join with all tag-receiver combinations
+  combined <- dtc_obs[tag_rec_comb, on = .(receiver_run, transmitter_instr_id, tbin, receiver_serial_no) ]
+  setkey(combined, transmitter_instr_id, receiver_serial_no, tbin)
+
+  # add number of transmissions detected to same column as zero detections
+  combined[!is.na(num_dtc), tran_dtc := num_dtc]
+
+  # add transmitter delay info
+  combined[hst1, tag_min_delay := tag_min_delay, on = .(transmitter_instr_id = instr_id)]
+  combined[hst1, tag_max_delay := tag_max_delay, on = .(transmitter_instr_id = instr_id)]
+
+  # add transmitter lat/lon
+  combined[hst1, transmitter_longitude := longitude, on  = .(transmitter_instr_id = instr_id, receiver_run = run)]
+  combined[hst1, transmitter_latitude := latitude, on = .(transmitter_instr_id = instr_id, receiver_run = run)]
+  
+  # add transmitter frequency
+  combined[hst1, receiver_frequency := freq, on = .(transmitter_instr_id = instr_id, receiver_run = run)]
+
+  # calculate nominal delay
+  combined[, nom_delay := ((tag_max_delay - tag_min_delay)/2) + tag_min_delay]
+
+  # calculate expected transmissions
+  combined[, exp_tran := bsize/nom_delay]
+
+  # calculate detection prob
+  combined[, dtc_prob := tran_dtc/exp_tran]
+
+  combined[, `:=`(glider_lon = approx(x = glider_geo$time[!is.na(glider_geo$lon_dd)],
+                                      y = glider_geo$lon_dd[!is.na(glider_geo$lon_dd)],
+                                      xout = tbin,
+                                      ties = "ordered")$y,
+                  glider_lat = approx(x = glider_geo$time[!is.na(glider_geo$lat_dd)],
+                                      y = glider_geo$lat_dd[!is.na(glider_geo$lon_dd)],
+                                      xout = tbin,
+                                      ties = "ordered")$y)]
+  
+  combined[, rt_distance_m := geosphere::distVincentyEllipsoid(p1 = cbind(glider_lon, glider_lat), p2 = cbind(transmitter_longitude, transmitter_latitude))]
+
+   combined[bounds, event := event, on = .(tbin >= start, tbin <= end)]
+   combined <- combined[!is.na(event),]
+
+  setkey(combined, receiver_run, transmitter_instr_id, tbin)
+
+
+  return(combined)
+}
+
+
+
+
+
+#' @title discrete detection probability plot for stationary tags to glider (69kHz). These are hard-coded!
+#' tar_load(discrete_dtc_prob)
+#' dtc = discrete_dtc_prob
+#' trial = 1 # Hammond Bay
+#' # trial = 2 # saginaw Bay
+#' out_pth = "output/discrete_HB.pdf"
+
+discrete_rng_crv <- function(dtc = discrete_dtc_prob, trial, out_pth, ...){
+  foo <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406") & receiver_serial_no %in% c("457003", "458000")]
+
+  setkey(foo, receiver_run, rt_distance_m)
+
+  pdf(out_pth)  
+  plot(dtc_prob ~ rt_distance_m, data = foo[receiver_run == trial], type = "p", xlim = c(0,3000), ylim = c(0,1), pch = 16, ...)
+  bar <- foo[receiver_run == 1]
+  
+  low <- loess(dtc_prob ~ rt_distance_m, data = bar, span = 0.2)
+  bar[, loe_pred := predict(low, bar)]
+  lines(loe_pred ~ rt_distance_m, data = bar, col = "red")
+
+  dev.off()
+  
+  return(out_pth)
+}
 
 
 ##########################
@@ -804,9 +989,11 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
 #' tar_load(hst)
 #' trial = 2
 #' out_pth = "output/rec_abacus_SB.pdf"
-#' receiver_abacus(dtc = dtc, hst = hst, trial = 1, main = "Hammond Bay receiver detections", out_pth = out_pth)
+#' tar_load(data_present)
+#' bounds = data_present
+#' receiver_abacus(dtc = dtc, hst = hst, trial = 1, main = "Hammond Bay receiver detections", out_pth = out_pth, bounds = data_present)
 
-receiver_abacus <- function(dtc, hst, trial, out_pth, ...){
+receiver_abacus <- function(dtc, hst, trial, out_pth, bounds = data_present, ...){
 
   dtc <- dtc[receiver_run == trial,]
   hst <- hst[run == trial,]
@@ -821,6 +1008,8 @@ receiver_abacus <- function(dtc, hst, trial, out_pth, ...){
   pdf(out_pth)
   par(mar = c(4,10,3,2), oma = c(0,1,0,0))
   plot(as.numeric(label) ~ datetime, data = dtc, axes = FALSE, col = "red", pch = 16, xlab = "time", ylab = NA, xlim = c(trial_start, trial_end), ...)
+  abline(v = bounds$start, col = "red", lwd = 2, lty = "dashed")
+  abline(v = bounds$end, col = "blue", lwd = 2, lty = "dashed")
   axis.POSIXct(1, x = tseries, format = "%Y-%m-%d")
   axis(2, at = unique(dtc$receiver_serial_no_fac), labels = levels(dtc$label), las = 1)
   box()
@@ -832,190 +1021,51 @@ receiver_abacus <- function(dtc, hst, trial, out_pth, ...){
 
 
 
+#######################
+#' file abacus plot
+#' tar_load(clean_mission)
+#' dtc = clean_mission
 
+file_abacus <- function(dtc = clean_mission, out_pth){
+  file_ints <- unique(dtc, by = c("file_num", "start_time", "end_time"))
 
+  start <- min(file_ints$start_time)
+  end <- max(file_ints$end_time)
+  file_ints[, label := as.factor(file_num)]
 
+  pdf(out_pth)
+  par(las = 1)
+  plot(as.numeric(label) ~ start_time, data = file_ints, col = "green", pch = 16, xlab = "time", ylab = NA, xlim = c(start, end))
+  points(as.numeric(label) ~ end_time, data = file_ints, col = "red", pch = 16)
+  segments(x0 = file_ints$start_time, y0 = file_ints$file_num, x1 = file_ints$end_time, y1 = file_ints$file_num, col = "black")
 
+  dev.off()
+  return(out_pth)
+}
 
 
+#' tar_load(clean_mission)
+#' dtc = clean_mission
 
 
+.data_bounds <- function(dtc = clean_mission){
+  out <- unique(dtc[, c("file_num", "start_time", "end_time")])
+  out[, `:=`(start_time = as.numeric(start_time), end_time = as.numeric(end_time))]
+  
+  int <- as.data.table(intervals::interval_union(intervals::Intervals(as.matrix(out[,c("start_time", "end_time")])), check_valid = TRUE))
+  int[, group := 1:.N]
 
-# exploratory analysis using tensor product model.  Should be able to predict detection probability for constant distance
-# and detection range curves for each day.
+  setkey(out, start_time, end_time)
+  setkey(int, V1, V2)
 
+  out <- foverlaps(int, out)
+  out <- out[, c("group", "V1", "V2")]
 
-#' @title fit varying coefficient (on transmitter frequency) to stationary tag-glider detection data
-#' @examples
-#' tar_load("glider_dtc_range")
-#' dtc = glider_dtc_range
-#' limit_dist_m = 2500
-#' trial_run = 1
-## library(mgcv)
-## range(dtc[trial == 2]$datetime)
-##    dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
+  out[, start := as.POSIXct(V1, tz = "UTC", origin = "1970-01-01 00:00:00")]
+  out[, end := as.POSIXct(V2, tz = "UTC", origin = "1970-01-01 00:00:00")]
+  out <- unique(out[, !c("V1", "V2")])
+  setnames(out, "group", "event")
+  return(out)
+}
 
-## ## mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", k = 40, by = as.factor(transmitter_freq)), data = dtc.i, family = "binomial")
-## dtc.i[, datetime := as.numeric(datetime)]
-## dtc.i[, transmitter_freq := as.factor(transmitter_freq)]
 
-## #mod1 <- gam(tran_dtc ~ s(datetime, bs = "cs", by = transmitter_freq), data = dtc.i, family = "binomial")
-
-
-
-## ## dtc.i[, ts := as.numeric(datetime)]
-## mod2 <- gam(tran_dtc ~ te(datetime, rt_distance_m, bs = c("cs", "cs"), by = as.factor(transmitter_freq)), data = dtc.i, family = "binomial")
-
-
-## new_data <- data.table(rt_distance_m = rep(c(1000,1000), each = 400), transmitter_freq = as.factor(rep(c(69, 180), each = 400)), datetime = rep(seq(from = min(dtc.i$datetime), to = max(dtc.i$datetime), length.out = 400), times = 2))
-
-## new_data[, pred := predict(mod2, newdata = new_data, type = "response")]
-## new_data[, datetime := as.POSIXct(datetime, tz = "UTC", origin = "1970-01-01 00:00:00")]
-
-
-## plot(pred ~ datetime, data = new_data[transmitter_freq == 69,], type = "o",  ylim = c(0,1), xaxt = "n")
-## axis.POSIXct(1, at = seq(min(new_data$datetime), max(new_data$datetime), "1 day"), format = "%Y-%m-%d")
-## plot(pred ~ datetime, data = new_data[transmitter_freq == 180,], type = "o", ylim = c(0,1), xaxt = "n")
-## axis.POSIXct(1, at = seq(min(new_data$datetime), max(new_data$datetime), "1 day"), format = "%Y-%m-%d")
-
-
-
-# JUNK BELOW TO END
-
-## vis.gam(mod2, view = c("rt_distance_m", "datetime"), cond = list(transmitter_freq = 69), type = "response", zlim = c(0,1), xlim = c(0, 2500), n.grid = 200)
-## vis.gam(mod2, view = c("rt_distance_m"), con = list(transmitter_freq = 69), type = "response", zlim = c(0,1), xlim = c(0,2500))
-## vis.gam(mod5)
-
-## library(gratia)
-## draw(mod2)
-
-## test <- predict(mod2, type = "response")
-## dtc.i[, pred := predict(mod2, type = "response")]
-## range(dtc.i[transmitter_freq == 69][["pred"]])
-
-
-
-
-
-## ## dtc.i[, mod2_fit := predict(mod2, type = "response")]
-
-
-
-
-## ## setkey(dtc.i, transmitter_freq, datetime)
-## ## plot(mod2_fit ~ rt_distance_m, data = dtc.i[transmitter_freq == 180], pch = 16, col = "red", type = "o") 
-## ## plot(mod2_fit ~ as.numeric(datetime), data = dtc.i[transmitter_freq == 69], col = "red", type = "o")
-
-
-## ## plot(mod1)
-
-
-## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 180], xlim = c(0,1000), pch = 16)
-## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], xlim = c(0,3000), pch = 16)
-
-## ## appraise(mod)
-## ## draw(mod)
-## ## dtc[, mod_fit := predict(mod, type = "response")]
-## ## gam.check(mod)
-
-## ## setkey(dtc, transmitter_freq, rt_distance_m)
-## ## plot(tran_dtc ~ rt_distance_m , data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69kHz", las = 1)
-## ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
-
-
-## ## https://fromthebottomoftheheap.net/2018/12/10/confidence-intervals-for-glms/
-
-
-
-
-## #plot(resp ~ rt_distance_m, data = predicted_data[transmitter_freq == 69], type = "l")
-
-## ## library(ggplot2)
-
-## ## ggplot(new_data, aes(x = rt_distance_m, y = resp, group = transmitter_freq, color = as.factor(transmitter_freq))) +
-## ##   geom_line() +
-## ##   geom_rug(data = dtc, aes(y = tran_dtc, color = obs_col))
-
-
-## ## mod1 <- gam(tran_dtc ~ s(as.numeric(datetime), bs = "cs", by = as.factor(transmitter_freq)), data = dtc, family = "binomial")
-## ## draw(mod1)
-## ## dtc[, mod_fit_tm := predict(mod, type = "response")]
-
-## ## setkey(dtc, transmitter_freq, datetime)
-## ## plot(tran_dtc ~ as.numeric(datetime), data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69kHz", las = 1)
-## ## lines(mod_fit_tm ~ as.numeric(datetime), data = dtc[transmitter_freq == 69], col = "red")
-
-
-
-## ## dtc[, event_freq := paste(event, transmitter_freq, sep="_")]
-
-## ## mod2 <- gam(tran_dtc ~ s(as.numeric(datetime), bs = "cs", by = as.factor(event_freq), k = 15), data = dtc, family = "binomial")
-## ## draw(mod2)
-## ## gam.check(mod2)
-
-
-## ## mod3 <- gam(tran_dtc ~ t2(rt_distance_m, as.numeric(datetime), bs = c("cs", "cs"), k = c(40, 12), by = as.factor(transmitter_freq)), data = dtc, family = "binomial")
-
-
-
-
-## ## plot(tran_dtc ~ as.factor(event), data = dtc[dtc$transmitter_freq == ""], ylim = c(0,0.2))
-
-## ## dtc[, .(.N), by = .(event, tran_dtc, transmitter_freq)] 
-## ## dtc[, .(.N), by = .(tran_dtc, transmitter_freq)]
-
-
-
-
-
-
-
-
-## ## setkey(dtc, transmitter_freq, rt_distance_m)
-
-
-## ## pdf("output/initial_range_curves.pdf")
-## ## par(mfrow = c(2,1))
-## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 180], pch = 16, col = "black", main = "180 kHz", xlim = c(0,500), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
-## ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 180], col = "red")
-
-## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69 kHz", xlim = c(0,3000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
-## ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
-## ## dev.off()
-
-
-## ## library(gratia)
-## ## draw(mod)
-## ## appraise(mod)
-
-
-
-
-## ## ####
-## ## pdf("output/initial_range_curves.pdf")
-## ## par(mfrow = c(6,1))
-## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_instr_id == "A69-1604-32402"], pch = 16, col = "black", main = "180 kHz", xlim = c(0,2000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
-## ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_instr_id == "A69-1604-32402"], col = "red")
-
-## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69], pch = 16, col = "black", main = "69 kHz", xlim = c(0,3000), las = 1, ylab = "detection prob", xlab = "tag-receiver dist (m)")
-## ## lines(mod_fit ~ rt_distance_m, data = dtc[transmitter_freq == 69], col = "red")
-## ## dev.off()
-
-
-
-
-
-## ## gam.check(mod)
-## ## plot.gam(mod)
-
-## ## ## plot(tran_dtc ~ rt_distance_m, data = dtc[transmitter_freq == 69])
-
-
-
-## ## load_mgcv()
-## ## df <- data_sim("eg1", n = 1000, dist = "poisson", scale = 0.1, seed = 6)
-
-## ## # A poisson example
-## ## m <- gam(y ~ s(x0, bs = "cr") + s(x1, bs = "cr") + s(x2, bs = "cr") +
-## ##          s(x3, bs = "cr"), family = poisson(), data = df, method = "REML")
-## ## rootogram(m, plot = TRUE)
