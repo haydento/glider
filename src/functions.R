@@ -744,57 +744,151 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   return(mod)
 }
 
+
+
+
+#' tar_load("GAMit_tensor_HB")
+#' mod <- GAMit_tensor_HB
+#' trial_run = 1
+#'
+#' tar_load("GAMit_tensor_SB")
+#' mod <- GAMit_tensor_SB
+#' trial_run = 2
+#'
+#' 
+#' tar_load("glider_dtc_range")
+#' dtc <- glider_dtc_range
+#' 
+#' limit_dist_m = 2500
+#' tar_load(data_bounds)
+
+# bones are here but needs fleshed out (below, next two functions)
+
+
 ## .mod_output_te <- function(mod = GAMit_tensor, dtc = glider_dtc_range, out_pth = "output/predicted_dtc_prob.pdf", limit_dist_m = 2500, trial_run = 1, ...) {
 
 ##   dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
-##   predicted_data = dtc.i[, c("datetime", "rt_distance_m", "transmitter_instr_model")]
-##   predicted_data[, datetime := as.numeric(datetime)]
-##   predicted_data[, transmitter_instr_model := as.factor(transmitter_instr_model)]
 
+##   dtc.i[tran_dtc == 0, obs_col := "black"][tran_dtc == 1, obs_col := "red"]
+##   rt_distance_m = seq(min(dtc.i$rt_distance_m, na.rm = TRUE), limit_dist_m, length.out = 500)
+##   pred_time <- as.numeric(seq(min(dtc.i$datetime), max(dtc.i$datetime), length.out = 10))
+##   fix_dist <- 1500
   
+##   predicted_data <- CJ(transmitter_instr_model = unique(dtc.i$transmitter_instr_model), rt_distance_m = rt_distance_m, datetime = pred_time)
+##   predicted_data[data_bounds, event := event, on = .(datetime >= start, datetime <= end)]
+##   predicted_data <- predicted_data[!is.na(event),]
+
+
 ##   ilink <- family(mod)$linkinv
 ##   fit <-  predict(mod, newdata = predicted_data, se.fit = TRUE, type = "link")
-
+  
 ##   predicted_data[, `:=`(fit_link = fit$fit, se_link = fit$se.fit)] 
 ##   predicted_data[, `:=`(fit_resp = ilink(fit_link), fit_upr = ilink(fit_link + (2 * se_link)), fit_lwr = ilink(fit_link - (2 * se_link)))]
+##   predicted_data[, `:=`(datetime = as.POSIXct(datetime, origin = '1970-01-01 00:00:00', tz = "UTC"))]
 
-##   setkey(predicted_data, transmitter_instr_model, rt_distance_m)
+##   setkey(predicted_data, transmitter_instr_model, datetime)
 
-##   pdf(out_pth)
-##   par(mfrow = c(2,1), oma = c(0,0,2,0), mar = c(4,4,0,0))
+  
+## ##   ## pdf(out_pth)
+## ##   ## par(mfrow = c(2,1), oma = c(0,0,2,0), mar = c(4,4,0,0))
 
+
+
+## out <- predicted_data[transmitter_instr_model == "V9-2x-180K"]
+  
+##   ggplot(out, aes(x = rt_distance_m, y = fit_resp, group = datetime, col = as.factor(datetime))) +
+##     geom_line()
+
+
+  
+
+  
 ##   # plot 69 kHz
-##   plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_instr_model %in% c("V13-1x-H")], type = "l", las = 1, ylim = c(0,1), ylab = "dtc prob (+-2SE)", xlim = c(0, 2500), col = "blue")
-##   lines(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_instr_model %in% c("V13-1x-L")], col = "red")
-
+##   plot(fit_resp ~ datetime, data = predicted_data[transmitter_instr_model %in% c("V13-1x-H")], type = "p", las = 1, ylim = c(0,1), ylab = "dtc prob (+-2SE)", col = "blue")
+##   points(fit_resp ~ datetime, data = predicted_data[transmitter_instr_model %in% c("V13-1x-L")], col = "red")
+##   points(fit_resp ~ datetime, data = predicted_data[transmitter_instr_model %in% c("V9-2x-180K")], col = "black")
+                                                                                                    
 ##   # V13-H error
-##   polygon(c(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["rt_distance_m"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["rt_distance_m"]])),
+##   polygon(c(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["datetime"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["datetime"]])),
 ##         c(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["fit_lwr"]])), col = scales::alpha("blue", 0.1), border = "blue", lwd = 1.5 )
 
 ##   #V13-L error
-##   polygon(c(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["rt_distance_m"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["rt_distance_m"]])),
-##         c(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["fit_lwr"]])), col = scales::alpha("blue", 0.1), border = "red", lwd = 1.5 )
-
-##     rug(dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc == 0,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc == 0,][["obs_col"]], ticksize = 0.02, lwd = 0.5)
-##   rug(dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V13-1x-L", "V13-1x-H") & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
-
-##   legend("topright", lty = c(1,1), col = c("blue", "red"), legend = c("V13-1x-H", "V13-1x-L"))
-
-##   # plot 180 kHz
-##   plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter_instr_model %in% c("V9-2x-180K")], type = "l", las = 1, ylim = c(0,1), ylab = "dtc prob (+-2SE)", xlab = "glider-tag distance", xlim = c(0, 2500), col = "blue")
-  
-##   polygon(c(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["rt_distance_m"]], rev(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["rt_distance_m"]])),
-##         c(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["fit_lwr"]])), col = scales::alpha("blue", 0.1), border = "blue", lwd = 1.5 )
+##   polygon(c(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["datetime"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["datetime"]])),
+##         c(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["fit_lwr"]])), col = scales::alpha("red", 0.1), border = "red", lwd = 1.5 )
 
 
-##     rug(dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc == 0,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc == 0,][["obs_col"]], ticksize = 0.02, lwd = 0.5)
-##   rug(dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc == 1,][["rt_distance_m"]], side = 1, col = dtc.i[transmitter_instr_model %in% c("V9-2x-180K") & tran_dtc ==1,][["obs_col"]], ticksize = -0.02, lwd = 0.5)
+##   #180kHz error
+##   polygon(c(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["datetime"]], rev(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["datetime"]])),
+##         c(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["fit_lwr"]])), col = scales::alpha("black", 0.1), border = "black", lwd = 1.5 )
+
 
 ##   legend("topright", lty = c(1,1), col = c("blue"), legend = c("V9-2x-180K"))
 
 ##   mtext(..., side = 3, outer = TRUE, line = 0)
-  
+
 ##   dev.off()
+
+##   return(out_pth)
+  
+## }
+
+
+## #####################################
+## # function below plots detection range as a function of time at fixed distance
+
+
+## .mod_output_te <- function(mod = GAMit_tensor, dtc = glider_dtc_range, out_pth = "output/predicted_dtc_prob.pdf", limit_dist_m = 2500, trial_run = 1, ...) {
+
+##   dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
+
+##   dtc.i[tran_dtc == 0, obs_col := "black"][tran_dtc == 1, obs_col := "red"]
+##   rt_distance_m = seq(min(dtc.i$rt_distance_m, na.rm = TRUE), limit_dist_m, length.out = 500)
+##   pred_time <- as.numeric(seq(min(dtc.i$datetime), max(dtc.i$datetime), length.out = 500))
+##   fix_dist <- 1500
+  
+##   predicted_data <- CJ(transmitter_instr_model = unique(dtc.i$transmitter_instr_model), rt_distance_m = fix_dist, datetime = pred_time)
+##   predicted_data[data_bounds, event := event, on = .(datetime >= start, datetime <= end)]
+##   predicted_data <- predicted_data[!is.na(event),]
+
+
+##   ilink <- family(mod)$linkinv
+##   fit <-  predict(mod, newdata = predicted_data, se.fit = TRUE, type = "link")
+  
+##   predicted_data[, `:=`(fit_link = fit$fit, se_link = fit$se.fit)] 
+##   predicted_data[, `:=`(fit_resp = ilink(fit_link), fit_upr = ilink(fit_link + (2 * se_link)), fit_lwr = ilink(fit_link - (2 * se_link)))]
+##   predicted_data[, `:=`(datetime = as.POSIXct(datetime, origin = '1970-01-01 00:00:00', tz = "UTC"))]
+
+##   setkey(predicted_data, transmitter_instr_model, datetime)
+
+  
+## ##   ## pdf(out_pth)
+## ##   ## par(mfrow = c(2,1), oma = c(0,0,2,0), mar = c(4,4,0,0))
+
+##   # plot 69 kHz
+##   plot(fit_resp ~ datetime, data = predicted_data[transmitter_instr_model %in% c("V13-1x-H")], type = "p", las = 1, ylim = c(0,1), ylab = "dtc prob (+-2SE)", col = "blue")
+##   points(fit_resp ~ datetime, data = predicted_data[transmitter_instr_model %in% c("V13-1x-L")], col = "red")
+##   points(fit_resp ~ datetime, data = predicted_data[transmitter_instr_model %in% c("V9-2x-180K")], col = "black")
+                                                                                                    
+##   # V13-H error
+##   polygon(c(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["datetime"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["datetime"]])),
+##         c(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-H")][["fit_lwr"]])), col = scales::alpha("blue", 0.1), border = "blue", lwd = 1.5 )
+
+##   #V13-L error
+##   polygon(c(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["datetime"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["datetime"]])),
+##         c(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V13-1x-L")][["fit_lwr"]])), col = scales::alpha("red", 0.1), border = "red", lwd = 1.5 )
+
+
+##   #180kHz error
+##   polygon(c(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["datetime"]], rev(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["datetime"]])),
+##         c(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["fit_upr"]], rev(predicted_data[transmitter_instr_model %in% c("V9-2x-180K")][["fit_lwr"]])), col = scales::alpha("black", 0.1), border = "black", lwd = 1.5 )
+
+
+##   legend("topright", lty = c(1,1), col = c("blue"), legend = c("V9-2x-180K"))
+
+##   mtext(..., side = 3, outer = TRUE, line = 0)
+
+##   dev.off()
+
 ##   return(out_pth)
   
 ## }
