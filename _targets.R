@@ -3,7 +3,7 @@ library(tarchetypes)
 source("src/functions.R")
 source("src/vem.R")
 
-tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr", "geosphere", "leafem", "tarchetypes", "mgcv"))
+tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr", "geosphere", "leafem", "tarchetypes", "mgcv", "ggplot2"))
 
 list(
 
@@ -250,8 +250,37 @@ list(
    GAMit_tensor_HB,
    .GAMit_tensor(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 3000),
    format = "rds"
-   )
-  
+ ),
+ 
+
+tar_target(
+  dtc_prob_dist_HB,
+  .dtc_prob_dist(mod = GAMit_tensor_HB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_rt_dist_HB.pdf", limit_dist_m = 2500, trial_run=1, bounds = data_bounds),
+  format = "file"
+),
+
+
+tar_target(
+  dtc_prob_dist_SB,
+  .dtc_prob_dist(mod = GAMit_tensor_SB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_rt_dist_SB.pdf", limit_dist_m = 2500, trial_run=2, bounds = data_bounds),
+  format = "file"
+),
+
+tar_target(
+  dtc_prob_time_HB,
+  .dtc_prob_time(mod = GAMit_tensor_HB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_500m_HB.pdf", limit_dist_m = 2500, trial_run=1, bounds = data_bounds),
+  format = "file"
+), 
+
+tar_target(
+  dtc_prob_time_SB,
+  .dtc_prob_time(mod = GAMit_tensor_SB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_500m_SB.pdf", limit_dist_m = 2500, trial_run=2, bounds = data_bounds),
+  format = "file"
 )
+
+
+
+)
+
 
 
