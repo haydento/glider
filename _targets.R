@@ -151,7 +151,7 @@ list(
   # impute missed detections on tags 
   tar_target(
     imputed_transmissions,
-    impute_missing_transmissions(dtc = vrl_vem_combined_dtc, hst = hst),
+    impute_missing_transmissions(dtc = vrl_vem_combined_dtc, hst = hst, mooring_type = "stationary"),
     format = "fst_dt"
   ),
 

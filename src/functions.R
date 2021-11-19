@@ -593,17 +593,20 @@ na_interpolation <- function (x, option = "linear", maxgap = Inf, ...)
 #' @title impute tag transmissions from colocated tag and receiver
 #' @param dtc combined detection/vem dataset
 #' @param hst cleaned gear deployment info
+#' @param mooring_type either "stationary" or "mobile".  
 #' 
 #' @examples
 #' tar_load("vrl_vem_combined_dtc")
 #' tar_load("hst")
 #'  dtc <- vrl_vem_combined_dtc
+#' mrng_type = "mobile"
+#' impute_missing_transmissions(dtc, hst, mrng_type = "stationary")
 
-impute_missing_transmissions <- function(dtc, hst){
+impute_missing_transmissions <- function(dtc, hst, mrng_type = "stationary"){
 
   # find co-located receiver for each stationary tag
-  tags <- hst[instr == "tag" & mooring_type == "stationary"]
-  recs <- hst[instr == "receiver" & mooring_type == "stationary"]
+  tags <- hst[instr == "tag" & mooring_type == mrng_type]
+  recs <- hst[instr == "receiver" & mooring_type == mrng_type]
   tags[recs, `:=` (colocated_rec = i.instr_id), on = .(run_id, run, site, freq)] 
 
   #
