@@ -1,4 +1,14 @@
-# functions used to extract science and mission data from glider and create leaflet map
+
+.load_glider <- function(in_pth){
+  dta <- fread(full_glider)
+  return(dta)
+}
+
+
+
+
+
+
 
 #' @title extract vrls
 #' @description function opens and creates csv files from each vrl file

@@ -276,10 +276,24 @@ tar_target(
   dtc_prob_time_SB,
   .dtc_prob_time(mod = GAMit_tensor_SB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_500m_SB.pdf", limit_dist_m = 2500, trial_run=2, bounds = data_bounds),
   format = "file"
+),
+
+tar_target(
+  full_glider,
+  "data/full_glider/Cormorant-20211013T1655_full_data.csv",
+    format = "file"
+##   ),
+
+## tar_target(
+##   load_glider,
+##   .load_glider(in_pth = full_glider),
+##   format = "fst_dt"
+## )
+
+  
+
+
 )
-
-
-
 )
 
 
