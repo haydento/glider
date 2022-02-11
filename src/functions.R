@@ -1,6 +1,22 @@
 
+#' @title load and clean up full glider data
+#' @description Function reads in file, cleans it up for further use
+#' @param in_pth file path to full data file.  must be *.csv
+#' @examples
+#' tar_load(full_glider_raw)
+#' .load_glider(in_pth = full_glider_raw)
+
 .load_glider <- function(in_pth){
-  dta <- fread(full_glider)
+  dta <- fread(in_pth, na.strings = "NaN")
+
+
+old_names = c("time (UTC)", "latitude (degrees_north)", "longitude (degrees_east)", "depth (m)", "backscatter (m-1 sr-1)", "cdom (ppb)", "chlorophyll (ug/l)", "conductivity (S m-1)", "density (kg m-3)", "dissolved_oxygen (%)", "instrument_ctd (1)", "m_depth (meters)", "m_water_depth (m)", "platform_meta (1)", "precise_lat (degree_north)", "precise_lon (degree_east)", "precise_time (UTC)", "pressure (bar)", "rinkoii_temperature (Celsius)", "salinity (1)", "sci_flur_units (ppb)", "temperature (Celsius)", "u (m s-1)", "v (m s-1)")
+
+
+new_names = c("time_UTC", "latitude", "longitude", "depth_m", "backscatter_m-1_sr-1", "cdom_ppb", "chlorophyll_ug_l", "conductivity_S_m-1", "density_kg_m-3", "dissolved_oxygen_%", "instrument_ctd_1", "m_depth_m", "m_water_depth_m", "platform_meta_1", "precise_lat", "precise_lon", "precise_time_utc", "pressure_bar", "rinkoii_temperature_C", "salinity_1", "sci_flur_units_ppb", "temperature_C", "u_m_s-1", "v_m_s-1")  
+  
+  setnames(dta, old_names, new_names)
+
   return(dta)
 }
 
