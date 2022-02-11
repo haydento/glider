@@ -151,7 +151,7 @@ list(
   # impute missed detections on tags 
   tar_target(
     imputed_transmissions,
-    impute_missing_transmissions(dtc = vrl_vem_combined_dtc, hst = hst, mooring_type = "stationary"),
+    impute_missing_transmissions(dtc = vrl_vem_combined_dtc, hst = hst, mrng_type = "stationary"),
     format = "fst_dt"
   ),
 
@@ -252,13 +252,11 @@ list(
    format = "rds"
  ),
  
-
 tar_target(
   dtc_prob_dist_HB,
   .dtc_prob_dist(mod = GAMit_tensor_HB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_rt_dist_HB.pdf", limit_dist_m = 2500, trial_run=1, bounds = data_bounds),
   format = "file"
 ),
-
 
 tar_target(
   dtc_prob_dist_SB,
@@ -279,21 +277,18 @@ tar_target(
 ),
 
 tar_target(
-  full_glider,
+  full_glider_raw,
   "data/full_glider/Cormorant-20211013T1655_full_data.csv",
     format = "file"
-##   ),
+),
 
-## tar_target(
-##   load_glider,
-##   .load_glider(in_pth = full_glider),
-##   format = "fst_dt"
-## )
+tar_target(
+  full_glider,
+  .load_glider(in_pth = full_glider_raw),
+  format = "fst_dt"
+)
 
   
-
-
-)
 )
 
 
