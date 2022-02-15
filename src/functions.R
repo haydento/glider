@@ -45,9 +45,12 @@ extract_vrl <- function(in_pth, out_dir, vdat_pth){
   fls <- list.files(path = in_pth, pattern="*.vrl", full.names = TRUE)
   fls_arg <- paste(shQuote(fls), collapse= " ")
    
-  vdat_pth <- file.path(path.expand(vdat_pth), "vdat")
+#  vdat_pth <- file.path(path.expand(vdat_pth), "vdat")
+  vdat_pth <- file.path(normalizePath(vdat_pth), "vdat")
 
-  out_dir <- path.expand(out_dir)
+  #out_dir <- path.expand(out_dir)
+  out_dir <- normalizePath(out_dir)
+  
   out_names <- sub(".vrl$", ".csv", x = basename(fls))
   temp_out <- file.path(tdir, out_names)
   final_files <- file.path(out_dir, out_names)
@@ -509,6 +512,7 @@ coords_table <- function(out_tbl){#, path = "output/juv_coords.html"){
 #' tar_load("vrl_vem_combined_dtc")
 #' dtc <- vrl_vem_combined_dtc
 #'# for Devi
+#' 
 #' test <- dtc[receiver_run == 2 & receiver_freq == 69 & (transmitter_instr_id == "A69-1604-32404"), c("datetime", "transmitter_instr_model", "transmitter_freq", "transmitter_instr_id")]
 #' dtc <- test
 #' t_thresh = 240
