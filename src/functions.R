@@ -20,12 +20,6 @@ new_names = c("time_UTC", "latitude", "longitude", "depth_m", "backscatter_m-1_s
   return(dta)
 }
 
-
-
-
-
-
-
 #' @title extract vrls
 #' @description function opens and creates csv files from each vrl file
 #' @param in_pth path to directory that contains raw vrl files
@@ -1049,10 +1043,15 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   
   combined[, rt_distance_m := geosphere::distVincentyEllipsoid(p1 = cbind(glider_lon, glider_lat), p2 = cbind(transmitter_longitude, transmitter_latitude))]
 
-   combined[bounds, event := event, on = .(tbin >= start, tbin <= end)]
-   combined <- combined[!is.na(event),]
+  combined[bounds, event := event, on = .(tbin >= start, tbin <= end)]
+  combined <- combined[!is.na(event),]
 
   setkey(combined, receiver_run, transmitter_instr_id, tbin)
+
+  combined[, num_success := num_dtc][is.na(num_success), num_success := 0]
+  combined[num_success > exp_tran, exp_tran := num_success]
+  combined[, num_failure := exp_tran - num_success]
+  
 
 
   return(combined)
@@ -1065,22 +1064,95 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
 #' @title discrete detection probability plot for stationary tags to glider (69kHz). These are hard-coded!
 #' tar_load(discrete_dtc_prob)
 #' dtc = discrete_dtc_prob
-#' trial = 1 # Hammond Bay
-#' # trial = 2 # saginaw Bay
-#' out_pth = "output/discrete_HB.pdf"
+#' trial = 2 # saginaw Bay
+#' trans = "A180-1702-61650"
+#' rec = 458000
+#' out_pth = "output/discrete_SB.pdf"
 
-discrete_rng_crv <- function(dtc = discrete_dtc_prob, trial, out_pth, ...){
-  foo <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406") & receiver_serial_no %in% c("457003", "458000")]
+
+.discrete_gam <- function(dtc = discrete_dtc_prob, trial, trans = "A180-1702-61650", rec = 458000){
+  foo <- dtc[transmitter_instr_id %in% trans & receiver_serial_no %in% rec & receiver_run %in% trial,]
+
+  mod <- gam(cbind(foo$num_success, foo$num_failure) ~ te(as.numeric(datetime), rt_distance_m), foo, family = "binomial")
+
+  return(mod)
+}
+
+  
+
+
+#' @title creates predicted detection range curves for specified tag and receiver combination.  uses model predictions from GAM.
+#' @param dtc discrete detection data
+#' @param trial trial (either 1 or two, corresponding to Hammond Bay (1) or Saginaw Bay (2) glider trial
+#' @param out_pth output figure path
+#' @param trans Transmitter that will be used in prediction. This must match model inputs
+#' @param rec receiver that will be used in prediction.  This must match model inputs
+#' @param limit_dist_m maximum distance plotted on x-axis
+#' @param bounds defines periods of time in which we have data available
+
+discrete_rng_crv <- function(dtc = discrete_dtc_prob, trial, out_pth, trans = "A180-1702-61650", rec = 458000, limit_dist_m, bounds){
+
+  foo <- dtc[transmitter_instr_id %in% trans & receiver_serial_no %in% rec & receiver_run %in% trial,]
 
   setkey(foo, receiver_run, rt_distance_m)
 
-  pdf(out_pth)  
-  plot(dtc_prob ~ rt_distance_m, data = foo[receiver_run == trial], type = "p", xlim = c(0,3000), ylim = c(0,1), pch = 16, ...)
-  bar <- foo[receiver_run == 1]
+#  plot(dtc_prob ~ rt_distance_m, data = foo, type = "p", xlim = c(0,500), ylim = c(0,1), pch = 16, las = 1)
+ 
+  rt_distance_m = seq(min(foo$rt_distance_m, na.rm = TRUE), limit_dist_m, length.out = 500)
+
+  # next line chooses a specified number of equally spaced time bins to predict detection range curves for that time
+  pred_time <- as.numeric(seq(min(foo$tbin), max(foo$tbin), length.out = 100))
+  # to predict for all time bins...This takes forever!
+  # pred_time <- unique(dtc.i$datetime)
+
+  # make predicted data
+  predicted_data <- CJ(transmitter_instr_model = unique(foo$transmitter_instr_id), rt_distance_m = rt_distance_m, datetime = pred_time)
+  predicted_data[bounds, event := event, on = .(datetime >= start, datetime <= end)]
+  predicted_data <- predicted_data[!is.na(event),]
+
+  # define inverse link function
+  ilink <- family(mod)$linkinv
+
+  # make prediction (on non-back-transformed data)
+  fit <-  predict(mod, newdata = predicted_data, se.fit = TRUE, type = "link")
+
+  # calculate +- 2 SE
+  predicted_data[, `:=`(fit_link = fit$fit, se_link = fit$se.fit)] 
+  predicted_data[, `:=`(fit_resp = ilink(fit_link), fit_upr = ilink(fit_link + (2 * se_link)), fit_lwr = ilink(fit_link - (2 * se_link)))]
+  predicted_data[, `:=`(datetime = as.POSIXct(datetime, origin = '1970-01-01 00:00:00', tz = "UTC"))]
+
+  setkey(predicted_data, transmitter_instr_model, datetime)
+  predicted_data[, datetime_f := as.factor(datetime)]
+
+  #make plot (doesn't include error bars)
+  pl <- ggplot(predicted_data, aes(x = rt_distance_m,y = fit_resp, group = datetime_f)) +
+    geom_line(aes(color = datetime_f), size = 1, show.legend = FALSE) +
+    facet_wrap(vars(transmitter_instr_model)) #+
+  #scale_color_viridis_d()
+
+  pdf(out_pth)
+  print(pl)
+  dev.off()
+
+  return(out_pth)
+
+
+
+
+
+
+
+
+
+
+
   
-  low <- loess(dtc_prob ~ rt_distance_m, data = bar, span = 0.2)
-  bar[, loe_pred := predict(low, bar)]
-  lines(loe_pred ~ rt_distance_m, data = bar, col = "red")
+
+
+  
+  low <- loess(dtc_prob ~ rt_distance_m, data = foo, span = 0.2)
+  foo[, loe_pred := predict(low, foo)]
+  lines(loe_pred ~ rt_distance_m, data = foo, col = "red")
 
   dev.off()
   
