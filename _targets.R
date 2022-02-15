@@ -149,48 +149,48 @@ list(
     ),
 
   # impute missed detections on tags 
-  tar_target(
-    imputed_transmissions,
-    impute_missing_transmissions(dtc = vrl_vem_combined_dtc, hst = hst, mrng_type = "stationary"),
-    format = "fst_dt"
-  ),
+  ## tar_target(
+  ##   imputed_transmissions,
+  ##   impute_missing_transmissions(dtc = vrl_vem_combined_dtc, hst = hst, mrng_type = "stationary"),
+  ##   format = "fst_dt"
+  ## ),
 
   
- tar_target(
-   glider_dtc_transmissions,
-   glider_dtc(dtc = vrl_vem_combined_dtc, receiver_site = c("cormorant", "mary_lou"), tag_beeps = imputed_transmissions, glider_geo = glider_trk),
-   format = "fst_dt"
- ),
+ ## tar_target(
+ ##   glider_dtc_transmissions,
+ ##   glider_dtc(dtc = vrl_vem_combined_dtc, receiver_site = c("cormorant", "mary_lou"), tag_beeps = imputed_transmissions, glider_geo = glider_trk),
+ ##   format = "fst_dt"
+ ## ),
 
- tar_target(
-   glider_dtc_range,
-   glider_dtc_transmissions_time_filtered(dtc = glider_dtc_transmissions, inter = data_bounds),
-   format = "fst_dt"
- ),
+ ## tar_target(
+ ##   glider_dtc_range,
+ ##   glider_dtc_transmissions_time_filtered(dtc = glider_dtc_transmissions, inter = data_bounds),
+ ##   format = "fst_dt"
+ ## ),
 
- tar_target( # GAM model of HB trial
-   GAMit_HB,
-   .GAMit(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 2500),
-   format = "rds"
- ),
+ ## tar_target( # GAM model of HB trial
+ ##   GAMit_HB,
+ ##   .GAMit(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 2500),
+ ##   format = "rds"
+ ## ),
 
- tar_target( # GAM model of SB trial
-   GAMit_SB,
-   .GAMit(dtc = glider_dtc_range, trial_run = 2, limit_dist_m = 2500),
-   format = "rds"
- ),
+ ## tar_target( # GAM model of SB trial
+ ##   GAMit_SB,
+ ##   .GAMit(dtc = glider_dtc_range, trial_run = 2, limit_dist_m = 2500),
+ ##   format = "rds"
+ ## ),
  
- tar_target( # model output for HB
-   mod_output_HB,
-   .mod_output(mod = GAMit_HB, dtc = glider_dtc_range, out_pth = "output/predicted_dtc_prob_HB.pdf", limit_dist_m = 2500, text = "Hammond Bay", trial_run = 1),
-   format = "file"
- ),
+ ## tar_target( # model output for HB
+ ##   mod_output_HB,
+ ##   .mod_output(mod = GAMit_HB, dtc = glider_dtc_range, out_pth = "output/predicted_dtc_prob_HB.pdf", limit_dist_m = 2500, text = "Hammond Bay", trial_run = 1),
+ ##   format = "file"
+ ## ),
 
- tar_target( # model output for SB
-   mod_output_SB,
-   .mod_output(mod = GAMit_SB, dtc = glider_dtc_range, out_pth = "output/predicted_dtc_prob_SB.pdf", limit_dist_m = 2500, text = "Saginaw Bay", trial_run = 2),
-   format = "file"
- ),
+ ## tar_target( # model output for SB
+ ##   mod_output_SB,
+ ##   .mod_output(mod = GAMit_SB, dtc = glider_dtc_range, out_pth = "output/predicted_dtc_prob_SB.pdf", limit_dist_m = 2500, text = "Saginaw Bay", trial_run = 2),
+ ##   format = "file"
+ ## ),
 
  tar_target( # receiver abacus for HB
    receiver_abacus_HB,
@@ -206,7 +206,7 @@ list(
 
  tar_target(
    discrete_dtc_prob,
-   .discrete_dtc_prob(gear_log = hst, dta = vrl_vem_combined_dtc, bsize = 3600, glider_geo = glider_trk, bounds = data_bounds),
+   .discrete_dtc_prob(gear_log = hst, dta = vrl_vem_combined_dtc, bsize = 60, glider_geo = glider_trk, bounds = data_bounds),
    format = "fst_dt"
  ),
 
@@ -222,17 +222,17 @@ list(
    format = "file"
  ),
 
- tar_target(
-   mission_data_summary,
-   file_abacus(dtc = clean_mission, out_pth = "output/mission_data_operating.pdf"),
-   format = "file"
- ),
+ ## tar_target(
+ ##   mission_data_summary,
+ ##   file_abacus(dtc = clean_mission, out_pth = "output/mission_data_operating.pdf"),
+ ##   format = "file"
+ ## ),
 
- tar_target(
-   science_data_summary,
-   file_abacus(dtc = clean_sci, out_pth = "output/science_data_operating.pdf"),
-   format = "file"
- ),
+ ## tar_target(
+ ##   science_data_summary,
+ ##   file_abacus(dtc = clean_sci, out_pth = "output/science_data_operating.pdf"),
+ ##   format = "file"
+ ## ),
 
  tar_target(
    data_bounds,
@@ -240,41 +240,41 @@ list(
    format = "fst_dt"
  ),
 
- tar_target(
-   GAMit_tensor_SB,
-   .GAMit_tensor(dtc = glider_dtc_range, trial_run = 2, limit_dist_m = 3000),
-   format = "rds"
- ),
+ ## tar_target(
+ ##   GAMit_tensor_SB,
+ ##   .GAMit_tensor(dtc = glider_dtc_range, trial_run = 2, limit_dist_m = 3000),
+ ##   format = "rds"
+ ## ),
 
- tar_target(
-   GAMit_tensor_HB,
-   .GAMit_tensor(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 3000),
-   format = "rds"
- ),
+ ## tar_target(
+ ##   GAMit_tensor_HB,
+ ##   .GAMit_tensor(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 3000),
+ ##   format = "rds"
+ ## ),
  
-tar_target(
-  dtc_prob_dist_HB,
-  .dtc_prob_dist(mod = GAMit_tensor_HB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_rt_dist_HB.pdf", limit_dist_m = 2500, trial_run=1, bounds = data_bounds),
-  format = "file"
-),
+## tar_target(
+##   dtc_prob_dist_HB,
+##   .dtc_prob_dist(mod = GAMit_tensor_HB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_rt_dist_HB.pdf", limit_dist_m = 2500, trial_run=1, bounds = data_bounds),
+##   format = "file"
+## ),
 
-tar_target(
-  dtc_prob_dist_SB,
-  .dtc_prob_dist(mod = GAMit_tensor_SB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_rt_dist_SB.pdf", limit_dist_m = 2500, trial_run=2, bounds = data_bounds),
-  format = "file"
-),
+## tar_target(
+##   dtc_prob_dist_SB,
+##   .dtc_prob_dist(mod = GAMit_tensor_SB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_rt_dist_SB.pdf", limit_dist_m = 2500, trial_run=2, bounds = data_bounds),
+##   format = "file"
+## ),
 
-tar_target(
-  dtc_prob_time_HB,
-  .dtc_prob_time(mod = GAMit_tensor_HB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_500m_HB.pdf", limit_dist_m = 2500, trial_run=1, bounds = data_bounds),
-  format = "file"
-), 
+## tar_target(
+##   dtc_prob_time_HB,
+##   .dtc_prob_time(mod = GAMit_tensor_HB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_500m_HB.pdf", limit_dist_m = 2500, trial_run=1, bounds = data_bounds),
+##   format = "file"
+## ), 
 
-tar_target(
-  dtc_prob_time_SB,
-  .dtc_prob_time(mod = GAMit_tensor_SB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_500m_SB.pdf", limit_dist_m = 2500, trial_run=2, bounds = data_bounds),
-  format = "file"
-),
+## tar_target(
+##   dtc_prob_time_SB,
+##   .dtc_prob_time(mod = GAMit_tensor_SB, dtc = glider_dtc_range, out_pth = "output/dtc_prob_500m_SB.pdf", limit_dist_m = 2500, trial_run=2, bounds = data_bounds),
+##   format = "file"
+## ),
 
 tar_target(
   full_glider_raw,
@@ -286,9 +286,27 @@ tar_target(
   full_glider,
   .load_glider(in_pth = full_glider_raw),
   format = "fst_dt"
-)
+),
 
-  
+# fits GAM with tensor smooth on rt distance and date to specified tag-receiver combination and trial.  Input data is discrete number of tag detections.  This target fits model to only SB data for stationary tag 61650 and glider receiver (mobile) 458000
+tar_target(
+  discrete_gam_SB,
+  .discrete_gam(dtc = discrete_dtc_prob, trial = 2, rec = 458000, trans = "A180-1702-61650"),
+  format = "rds"
+),
+
+tar_target(
+  discrete_model_predictions_SB,
+  .discrete_rng_crv(dtc = discrete_dtc_prob,
+                    mod = discrete_gam_SB,
+                    trial = 2,
+                    trans = "A180-1702-61650",
+                    rec = 48000,
+                    limit_dist_m = 1000,
+                    bounds = data_bounds
+                    ),
+  format = "rds"
+)
 )
 
 
