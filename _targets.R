@@ -302,7 +302,7 @@ tar_target(
                     trial = 2,
                     trans = "A180-1702-61650",
                     rec = c("458000"),
-                    limit_dist_m = 1000,
+                    limit_dist_m = 750,
                     bounds = data_bounds,
                     out_pth = "output/model_pred_discrete_SB.pdf"
                     ),
