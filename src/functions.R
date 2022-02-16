@@ -999,62 +999,86 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   recs <- hst1[instr == "receiver", "instr_id"]
   trial = unique(hst1$run)
 
-  # create all combinations of tag, receiver, and trials. Not all of these combinations are possible but will sort that out later.
+  # create all combinations of tag, receiver, and trials. Not all of these combinations are possible but will sort  out later.
   tag_rec_comb <- CJ(transmitter_instr_id = unique(tags$instr_id), receiver_serial_no = unique(recs$instr_id), receiver_run = unique(trial), tbin = tseq, tran_dtc = 0, unique = TRUE)
 
-  # count number of detections of each tag in each bin on each receiver and run
-  dtc_obs <- dtc[, .(num_dtc = .N, mean_rt_dist = mean(rt_distance_meters) ), by = .(receiver_run, transmitter_instr_id, tbin, receiver_serial_no, receiver_frequency )]
+  # calculate locations for all tags and receivers in full combination dataset
+  # how this is done depends on whether tag/receiver is moving or not...
+  # do static first
+  # recs separately from transmitters
+  stat_deps_recs <- hst1[mooring_type == "stationary",]
+  tag_rec_comb[stat_deps_recs, `:=` (receiver_mooring = mooring_type, receiver_latitude = latitude, receiver_longitude = longitude), on = .(receiver_serial_no = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
 
-  # join with all tag-receiver combinations
-  combined <- dtc_obs[tag_rec_comb, on = .(receiver_run, transmitter_instr_id, tbin, receiver_serial_no) ]
-  setkey(combined, transmitter_instr_id, receiver_serial_no, tbin)
+  # now transmitters
+  tag_rec_comb[stat_deps_recs, `:=` (transmitter_mooring = mooring_type, transmitter_latitude = latitude, transmitter_longitude = longitude), on = .(transmitter_instr_id = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
 
-  # add number of transmissions detected to same column as zero detections
-  combined[!is.na(num_dtc), tran_dtc := num_dtc]
+ # add mobile info
+  stat_deps_recs <- hst1[mooring_type == "mobile",]
+  tag_rec_comb[stat_deps_recs, receiver_mooring := mooring_type, on = .(receiver_serial_no = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
 
-  # add transmitter delay info
-  combined[hst1, tag_min_delay := tag_min_delay, on = .(transmitter_instr_id = instr_id)]
-  combined[hst1, tag_max_delay := tag_max_delay, on = .(transmitter_instr_id = instr_id)]
+  tag_rec_comb[stat_deps_recs, transmitter_mooring := mooring_type, on = .(transmitter_instr_id = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
 
-  # add transmitter lat/lon
-  combined[hst1, transmitter_longitude := longitude, on  = .(transmitter_instr_id = instr_id, receiver_run = run)]
-  combined[hst1, transmitter_latitude := latitude, on = .(transmitter_instr_id = instr_id, receiver_run = run)]
   
-  # add transmitter frequency
-  combined[hst1, receiver_frequency := freq, on = .(transmitter_instr_id = instr_id, receiver_run = run)]
-
-  # calculate nominal delay
-  combined[, nom_delay := ((tag_max_delay - tag_min_delay)/2) + tag_min_delay]
-
-  # calculate expected transmissions
-  combined[, exp_tran := bsize/nom_delay]
-
-  # calculate detection prob
-  combined[, dtc_prob := tran_dtc/exp_tran]
-
-  combined[, `:=`(glider_lon = approx(x = glider_geo$time[!is.na(glider_geo$lon_dd)],
+  # calculate average position during time bin for mobile transmitters and receivers
+  tag_rec_comb[receiver_mooring == "mobile" | transmitter_mooring == "mobile", `:=`(glider_lon_recs = approx(x = glider_geo$time[!is.na(glider_geo$lon_dd)],
                                       y = glider_geo$lon_dd[!is.na(glider_geo$lon_dd)],
                                       xout = tbin,
                                       ties = "ordered")$y,
-                  glider_lat = approx(x = glider_geo$time[!is.na(glider_geo$lat_dd)],
+                  glider_lat_recs = approx(x = glider_geo$time[!is.na(glider_geo$lat_dd)],
                                       y = glider_geo$lat_dd[!is.na(glider_geo$lon_dd)],
                                       xout = tbin,
                                       ties = "ordered")$y)]
   
-  combined[, rt_distance_m := geosphere::distVincentyEllipsoid(p1 = cbind(glider_lon, glider_lat), p2 = cbind(transmitter_longitude, transmitter_latitude))]
+  tag_rec_comb[is.na(receiver_latitude) & receiver_mooring == "mobile", `:=` (receiver_latitude = glider_lat_recs, receiver_longitude = glider_lon_recs),]
 
-  combined[bounds, event := event, on = .(tbin >= start, tbin <= end)]
-  combined <- combined[!is.na(event),]
+  tag_rec_comb[is.na(transmitter_latitude) & transmitter_mooring == "mobile",  `:=` (transmitter_latitude = glider_lat_recs, transmitter_longitude = glider_lon_recs),]
 
-  setkey(combined, receiver_run, transmitter_instr_id, tbin)
+  # remove invalid combinations
+  tag_rec_comb <- tag_rec_comb[!is.na(receiver_latitude) & !is.na(receiver_longitude) & !is.na(transmitter_longitude) & !is.na(transmitter_latitude),]
 
-  combined[, num_success := num_dtc][is.na(num_success), num_success := 0]
-  combined[num_success > exp_tran, exp_tran := num_success]
-  combined[, num_failure := exp_tran - num_success]
-  
+  # remove glider lat/lon- unneeded
+  tag_rec_comb[, glider_lon_recs := NULL][, glider_lat_recs := NULL]
 
 
-  return(combined)
+  dtc_obs <- dtc[, .(num_dtc = .N ), by = .(receiver_run, transmitter_instr_id, tbin, receiver_serial_no, receiver_frequency )]
+
+  # join with all tag-receiver combinations
+  combined <- dtc_obs[tag_rec_comb, on = .(receiver_run, transmitter_instr_id, tbin, receiver_serial_no) ]
+
+  tag_rec_comb[dtc_obs, tran_dtc := num_dtc, on = .(transmitter_instr_id, tbin, receiver_serial_no) ]
+
+  setkey(tag_rec_comb, transmitter_instr_id, receiver_serial_no, tbin)
+
+ 
+  # add transmitter delay info
+  tag_rec_comb[hst1, tag_min_delay := tag_min_delay, on = .(transmitter_instr_id = instr_id)]
+  tag_rec_comb[hst1, tag_max_delay := tag_max_delay, on = .(transmitter_instr_id = instr_id)]
+
+  # add transmitter frequency
+  tag_rec_comb[hst1, receiver_frequency := freq, on = .(transmitter_instr_id = instr_id)]
+
+  # calculate nominal delay
+  tag_rec_comb[, nom_delay := ((tag_max_delay - tag_min_delay)/2) + tag_min_delay]
+
+  # calculate expected transmissions
+  tag_rec_comb[, exp_tran := bsize/nom_delay]
+
+  # calculate detection prob
+  tag_rec_comb[, dtc_prob := tran_dtc/exp_tran]
+
+  # calculate tag-receiver distance
+  tag_rec_comb[, rt_distance_m := geosphere::distVincentyEllipsoid(p1 = cbind(receiver_longitude, receiver_latitude), p2 = cbind(transmitter_longitude, transmitter_latitude))]
+
+  tag_rec_comb[bounds, event := event, on = .(tbin >= start, tbin <= end)]
+  tag_rec_comb <- tag_rec_comb[!is.na(event),]
+
+  setkey(tag_rec_comb, receiver_run, transmitter_instr_id, tbin)
+
+  tag_rec_comb[, num_success := tran_dtc][is.na(num_success), num_success := 0]
+  tag_rec_comb[num_success > exp_tran, exp_tran := num_success]
+  tag_rec_comb[, num_failure := exp_tran - num_success]
+ 
+  return(tag_rec_comb)
 }
 
 
@@ -1062,8 +1086,8 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
 #' tar_load(discrete_dtc_prob)
 #' dtc = discrete_dtc_prob
 #' trial = 2 # saginaw Bay
-#' trans = c("A180-1702-61650", "A180-1702-61651")
-#' rec = 458000
+#' trans = c("A180-1702-61652")
+#' rec = c("300813", "300815")
 #' out_pth = "output/discrete_SB.pdf"
 
 
@@ -1112,15 +1136,22 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   rt_distance_m = seq(min(foo$rt_distance_m, na.rm = TRUE), limit_dist_m, length.out = 500)
 
   # next line chooses a specified number of equally spaced time bins to predict detection range curves for that time
-  pred_time <- as.numeric(seq(min(foo$tbin), max(foo$tbin), length.out = 200)
-                          )
-  # to predict for all time bins...This takes forever!
-  # pred_time <- unique(dtc.i$datetime)
+  #pred_time <- as.numeric(seq(min(foo$tbin), max(foo$tbin), length.out = 200)
+  #pred_time <- sample(unique(foo$tbin), length(unique(foo$tbin)) , replace = FALSE)
+
+  #pred_time <- sample(unique(foo$tbin), 10, replace = FALSE)
+  
+  # to predict for all time bins...This takes forever and does a ton of overplotting!
+   pred_time <- unique(foo$tbin)
 
   # make predicted data
   predicted_data <- CJ(transmitter_instr_model = unique(foo$transmitter_instr_id), rt_distance_m = rt_distance_m, tbin = pred_time)
   predicted_data[bounds, event := event, on = .(tbin >= start, tbin <= end)]
   predicted_data <- predicted_data[!is.na(event),]
+
+  # actual data- by tbin
+  real <- foo[tbin %in% pred_time,]
+  real[, datetime_f := as.factor(tbin)]
 
   # define inverse link function
   ilink <- family(mod)$linkinv
@@ -1132,7 +1163,6 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   predicted_data[, `:=`(fit_link = fit$fit, se_link = fit$se.fit)] 
   predicted_data[, `:=`(fit_resp = ilink(fit_link), fit_upr = ilink(fit_link + (2 * se_link)), fit_lwr = ilink(fit_link - (2 * se_link)))]
   predicted_data[, `:=`(tbin = as.POSIXct(tbin, origin = '1970-01-01 00:00:00', tz = "UTC"))]
-
   setkey(predicted_data, transmitter_instr_model, tbin)
   predicted_data[, datetime_f := as.factor(tbin)]
 
@@ -1140,7 +1170,10 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   pl <- ggplot(predicted_data, aes(x = rt_distance_m,y = fit_resp, group = datetime_f)) +
     geom_line(aes(color = datetime_f), size = 1, show.legend = FALSE) +
 #    facet_wrap(vars(transmitter_instr_model)) +
-    labs(title = paste0("tag: ", trans, ", rec: ", rec), x = "receiver-tag distance", y = "detection prob")
+  labs(title = paste0("tag: ", trans, ", rec: ", rec), x = "receiver-tag distance", y = "detection prob") +
+  scale_x_continuous(limits = c(0,1000)) +
+  scale_y_continuous(limits = c(0,1)) +
+  geom_point(data = real, aes(x = rt_distance_m, y = dtc_prob, group = datetime_f), color = "black")
   #scale_color_viridis_d()
 
   pdf(out_pth)
