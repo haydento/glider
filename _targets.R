@@ -206,7 +206,7 @@ list(
 
  tar_target(
    discrete_dtc_prob,
-   .discrete_dtc_prob(gear_log = hst, dta = vrl_vem_combined_dtc, bsize = 3600, glider_geo = glider_trk, bounds = data_bounds),
+   .discrete_dtc_prob(gear_log = hst, dta = vrl_vem_combined_dtc, bsize = 60, glider_geo = glider_trk, bounds = data_bounds),
    format = "fst_dt"
  ),
 
@@ -291,7 +291,7 @@ tar_target(
 # fits GAM with tensor smooth on rt distance and date to specified tag-receiver combination and trial.  Input data is discrete number of tag detections.  This target fits model to only SB data for stationary tag 61650 and glider receiver (mobile) 458000
 tar_target(
   discrete_gam_SB,
-  .discrete_gam(dtc = discrete_dtc_prob, trial = 2, rec = c(458000), trans = "A180-1702-61650"),
+  .discrete_gam(dtc = discrete_dtc_prob, trial = 2, rec = c("458000"), trans = "A180-1702-61650"),
   format = "rds"
 ),
 
