@@ -1075,6 +1075,9 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   tag_rec_comb[bounds, event := event, on = .(tbin >= start, tbin <= end)]
   tag_rec_comb <- tag_rec_comb[!is.na(event),]
 
+  # get rid of first trial data
+  tag_rec_comb <- tag_rec_comb[event > 1,]
+
   setkey(tag_rec_comb, transmitter_instr_id, tbin)
 
   tag_rec_comb[, num_success := tran_dtc][is.na(num_success), num_success := 0]
