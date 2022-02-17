@@ -977,48 +977,53 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
 #' bsize = 3600
 #' tar_load(data_bounds)
 #' bounds = data_bounds
+#' tags = "A69-1604-32403"
+#' recs = c("480026", "480027", "483814", "483815", "483829", "483846", "483868", "483871", "483884", "483888")
+#' trial = 2
+#' tst <- .discrete_dtc_prob(gear_log = hst,
+#'                      dta = vrl_vem_combined_dtc,
+#'                      bsize = 60,
+#'                      glider_geo = glider_trk,
+#'                      bounds = data_bounds,
+#'                      tags = "A69-1602-32403",
+#'                      recs = c("480026", "480027", "483814", "483815", "483829", "483846", "48#' 3868", "483871", "483884", "483888"), trial = 1)
 
 
-.discrete_dtc_prob <- function(gear_log = hst, dta = vrl_vem_combined, bsize = 3600, glider_geo, bounds ){
+
+
+.discrete_dtc_prob <- function(gear_log = hst, dta = vrl_vem_combined, bsize = 3600, glider_geo, bounds, tags, recs, trial ){
 
   # copy hst
   hst1 <- copy(gear_log)
   set(hst1, j = "freq", value = as.character(hst1$freq))
 
-  # copy dtc
-  dtc <- copy(dta)
-
+  # subset out receivers and tag information
+  dtc <- dta[transmitter_instr_id %in% tags & receiver_serial_no %in% recs & receiver_run == trial ,]
+  
   # range(vrl_vem_combined_dtc$datetime)
   tseq <- seq(from = lubridate::floor_date(min(dta$datetime), unit = "day"), to = lubridate::ceiling_date(max(dta$datetime), unit = "day"), by = bsize)
 
   # bin detections
   dtc[, tbin := tseq[findInterval(datetime, tseq)]]
 
-  # extract all tag, receiver, and trial ids
-  tags <- hst1[ instr == "tag", "instr_id"]
-  recs <- hst1[instr == "receiver", "instr_id"]
-  trial = unique(hst1$run)
-
   # create all combinations of tag, receiver, and trials. Not all of these combinations are possible but will sort  out later.
-  tag_rec_comb <- CJ(transmitter_instr_id = unique(tags$instr_id), receiver_serial_no = unique(recs$instr_id), receiver_run = unique(trial), tbin = tseq, tran_dtc = 0, unique = TRUE)
+  tag_rec_comb <- CJ(transmitter_instr_id = tags, receiver_serial_no = recs, tbin = tseq, tran_dtc = 0, unique = TRUE)
 
   # calculate locations for all tags and receivers in full combination dataset
   # how this is done depends on whether tag/receiver is moving or not...
   # do static first
   # recs separately from transmitters
-  stat_deps_recs <- hst1[mooring_type == "stationary",]
-  tag_rec_comb[stat_deps_recs, `:=` (receiver_mooring = mooring_type, receiver_latitude = latitude, receiver_longitude = longitude), on = .(receiver_serial_no = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
 
-  # now transmitters
-  tag_rec_comb[stat_deps_recs, `:=` (transmitter_mooring = mooring_type, transmitter_latitude = latitude, transmitter_longitude = longitude), on = .(transmitter_instr_id = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
+  rec_positions <- hst1[instr_id %in% recs, c("instr_id", "mooring_type", "timestamp_start_utc", "timestamp_end_utc", "latitude", "longitude"),]
 
- # add mobile info
-  stat_deps_recs <- hst1[mooring_type == "mobile",]
-  tag_rec_comb[stat_deps_recs, receiver_mooring := mooring_type, on = .(receiver_serial_no = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
+  tag_positions <- hst1[instr_id %in% tags, c("instr_id", "mooring_type", "timestamp_start_utc", "timestamp_end_utc", "latitude", "longitude"),]
 
-  tag_rec_comb[stat_deps_recs, transmitter_mooring := mooring_type, on = .(transmitter_instr_id = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
+  # join with receiver locations info.  Should not be NA if receivers are static.  Will be NA if receivers are mobile
+  tag_rec_comb[rec_positions, `:=` (receiver_mooring = mooring_type, receiver_latitude = latitude, receiver_longitude = longitude), on = .(receiver_serial_no = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
 
-  
+  # repeat above with tags.
+  tag_rec_comb[tag_positions, `:=` (transmitter_mooring = mooring_type, transmitter_latitude = latitude, transmitter_longitude = longitude), on = .(transmitter_instr_id = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
+
   # calculate average position during time bin for mobile transmitters and receivers
   tag_rec_comb[receiver_mooring == "mobile" | transmitter_mooring == "mobile", `:=`(glider_lon_recs = approx(x = glider_geo$time[!is.na(glider_geo$lon_dd)],
                                       y = glider_geo$lon_dd[!is.na(glider_geo$lon_dd)],
@@ -1039,12 +1044,10 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   # remove glider lat/lon- unneeded
   tag_rec_comb[, glider_lon_recs := NULL][, glider_lat_recs := NULL]
 
-
-  dtc_obs <- dtc[, .(num_dtc = .N ), by = .(receiver_run, transmitter_instr_id, tbin, receiver_serial_no, receiver_frequency )]
+  
+  dtc_obs <- dtc[, .(num_dtc = .N ), by = .(transmitter_instr_id, tbin, receiver_serial_no, receiver_frequency )]
 
   # join with all tag-receiver combinations
-  combined <- dtc_obs[tag_rec_comb, on = .(receiver_run, transmitter_instr_id, tbin, receiver_serial_no) ]
-
   tag_rec_comb[dtc_obs, tran_dtc := num_dtc, on = .(transmitter_instr_id, tbin, receiver_serial_no) ]
 
   setkey(tag_rec_comb, transmitter_instr_id, receiver_serial_no, tbin)
@@ -1072,7 +1075,7 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   tag_rec_comb[bounds, event := event, on = .(tbin >= start, tbin <= end)]
   tag_rec_comb <- tag_rec_comb[!is.na(event),]
 
-  setkey(tag_rec_comb, receiver_run, transmitter_instr_id, tbin)
+  setkey(tag_rec_comb, transmitter_instr_id, tbin)
 
   tag_rec_comb[, num_success := tran_dtc][is.na(num_success), num_success := 0]
   tag_rec_comb[num_success > exp_tran, exp_tran := num_success]
@@ -1091,10 +1094,14 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
 #' out_pth = "output/discrete_SB.pdf"
 
 
-.discrete_gam <- function(dtc = discrete_dtc_prob, trial, trans = c("A180-1702-61650"), rec = 458000){
-  foo <- dtc[transmitter_instr_id %in% trans & receiver_serial_no %in% rec & receiver_run %in% trial,]
+.discrete_gam <- function(dtc = discrete_dtc_prob){
 
-  mod <- gam(cbind(foo$num_success, foo$num_failure) ~ te(as.numeric(tbin), rt_distance_m), data = foo, family = "binomial", control = )
+  # detection probability for subset of days
+  #mod <- gam(cbind(dtc$num_success, dtc$num_failure) ~ te(as.numeric(tbin), rt_distance_m), data = dtc, family = "binomial")
+
+  dtc[, transmitter_instr_idF := as.factor(transmitter_instr_id)]
+  # "average" dtc prob
+  mod <- gam(cbind(num_success, num_failure) ~ s(rt_distance_m, by = transmitter_instr_idF), data = dtc, family = "binomial")
 
   return(mod)
 }
@@ -1113,46 +1120,44 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
 #' @examples
 #' tar_load(discrete_dtc_prob)
 #' dtc <- discrete_dtc_prob
-#' tar_load(discrete_gam_SB)
-#' mod <- discrete_gam_SB
-#' trial = 2
+#' tar_load(discrete_gam)
+#' mod <- discrete_gam
 #' out_pth = "output/tst.png"
-#' trans = "A180-1702-61650"
-#' rec = "458000"
 #' limit_dist_m = 1000
 #' tar_load(data_bounds)
 #' bounds = data_bounds
 
+#' .discrete_rng_crv(dtc, mod, limit_dist_m = 2000, bounds = data_bounds, out_pth = "output/model_pred_discrete.pdf")
+              
+.discrete_rng_crv <- function(dtc, mod, out_pth, limit_dist_m, bounds){
 
-
-.discrete_rng_crv <- function(dtc = discrete_dtc_prob, mod = mod, trial, out_pth, trans = "A180-1702-61650", rec = 458000, limit_dist_m, bounds){
-
-  foo <- dtc[transmitter_instr_id %in% trans & receiver_serial_no %in% as.character(rec) & receiver_run %in% trial,]
-
-  setkey(foo, receiver_run, rt_distance_m)
-
+#  foo <- dtc[transmitter_instr_id %in% trans & receiver_serial_no %in% as.character(rec) & receiver_run %in% trial,]
+#  setkey(dtc, receiver_run, rt_distance_m)
 #  plot(dtc_prob ~ rt_distance_m, data = foo, type = "p", xlim = c(0,500), ylim = c(0,1), pch = 16, las = 1)
  
-  rt_distance_m = seq(min(foo$rt_distance_m, na.rm = TRUE), limit_dist_m, length.out = 500)
+  rt_distance_m = seq(min(dtc$rt_distance_m, na.rm = TRUE), limit_dist_m, length.out = 500)
 
   # next line chooses a specified number of equally spaced time bins to predict detection range curves for that time
   #pred_time <- as.numeric(seq(min(foo$tbin), max(foo$tbin), length.out = 200)
-  #pred_time <- sample(unique(foo$tbin), length(unique(foo$tbin)) , replace = FALSE)
+  # pred_time <- sample(unique(foo$tbin), length(unique(foo$tbin)) , replace = FALSE)
 
-  #pred_time <- sample(unique(foo$tbin), 10, replace = FALSE)
+  pred_time <- sample(unique(dtc$tbin), 10, replace = FALSE)
   
   # to predict for all time bins...This takes forever and does a ton of overplotting!
-   pred_time <- unique(foo$tbin)
+  #   pred_time <- unique(foo$tbin)
 
   # make predicted data
-  predicted_data <- CJ(transmitter_instr_model = unique(foo$transmitter_instr_id), rt_distance_m = rt_distance_m, tbin = pred_time)
+  predicted_data <- CJ(transmitter_instr_model = unique(dtc$transmitter_instr_id), rt_distance_m = rt_distance_m, tbin = pred_time)
   predicted_data[bounds, event := event, on = .(tbin >= start, tbin <= end)]
   predicted_data <- predicted_data[!is.na(event),]
-
+  predicted_data[, tbin := as.numeric(tbin)]
+  
   # actual data- by tbin
-  real <- foo[tbin %in% pred_time,]
+  real <- dtc[tbin %in% pred_time,]
+  #real <- dtc
   real[, datetime_f := as.factor(tbin)]
 
+  
   # define inverse link function
   ilink <- family(mod)$linkinv
 
@@ -1166,15 +1171,20 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   setkey(predicted_data, transmitter_instr_model, tbin)
   predicted_data[, datetime_f := as.factor(tbin)]
 
-  #make plot (doesn't include error bars)
-  pl <- ggplot(predicted_data, aes(x = rt_distance_m,y = fit_resp, group = datetime_f)) +
-    geom_line(aes(color = datetime_f), size = 1, show.legend = FALSE) +
-#    facet_wrap(vars(transmitter_instr_model)) +
-  labs(title = paste0("tag: ", trans, ", rec: ", rec), x = "receiver-tag distance", y = "detection prob") +
-  scale_x_continuous(limits = c(0,1000)) +
-  scale_y_continuous(limits = c(0,1)) +
-  geom_point(data = real, aes(x = rt_distance_m, y = dtc_prob, group = datetime_f), color = "black")
-  #scale_color_viridis_d()
+  #make plot
+  pl <- ggplot(predicted_data, aes(x = rt_distance_m, y = fit_resp, group = datetime_f)) +
+    geom_line(aes(color = datetime_f), size = 1, show.legend = FALSE) + 
+#    geom_ribbon(data = predicted_data, aes(x = rt_distance_m, ymin = fit_lwr, ymax = fit_upr, color = datetime_f), alpha = 0.2, show.legend = FALSE, fill = "grey") +
+  
+    #    facet_wrap(vars(transmitter_instr_model)) +
+    scale_x_continuous(limits = c(0, limit_dist_m)) +
+    scale_y_continuous(limits = c(0,1)) +
+    geom_point(data = real, aes(x = rt_distance_m, y = dtc_prob), color = "black") +
+    labs(title = paste0("tags: ", unique(dtc$transmitter_instr_id)),
+         subtitle = paste0(", recs: ", dtc$receiver_serial_no),
+         x = "receiver-tag distance",
+         y = "detection prob") +
+  scale_color_viridis_d()
 
   pdf(out_pth)
   print(pl)
@@ -1276,5 +1286,98 @@ file_abacus <- function(dtc = clean_mission, out_pth){
   setnames(out, "group", "event")
   return(out)
 }
+
+
+
+
+#############################
+#' @examples
+#' tar_load(discrete_dtc_prob)
+#' dtc <- discrete_dtc_prob
+#' tar_load(discrete_gam)
+#' mod <- discrete_gam
+#' out_pth = "output/tst.png"
+#' limit_dist_m = 1000
+#' tar_load(data_bounds)
+#' bounds = data_bounds
+
+#' .discrete_rng_crv(dtc, mod, limit_dist_m = 2000, bounds = data_bounds, out_pth = "output/model_pred_discrete.pdf")
+
+
+.discrete_rng_crv_by <- function(dtc, mod, out_pth, limit_dist_m, bounds){
+ 
+  rt_distance_m = seq(min(dtc$rt_distance_m, na.rm = TRUE), limit_dist_m, length.out = 500)
+
+  # next line chooses a specified number of equally spaced time bins to predict detection range curves for that time
+  #pred_time <- as.numeric(seq(min(foo$tbin), max(foo$tbin), length.out = 200)
+  # pred_time <- sample(unique(foo$tbin), length(unique(foo$tbin)) , replace = FALSE)
+
+  pred_time <- sample(unique(dtc$tbin), 10, replace = FALSE)
+  
+  # to predict for all time bins...This takes forever and does a ton of overplotting!
+  #   pred_time <- unique(foo$tbin)
+
+  # make predicted data
+  predicted_data <- CJ(transmitter_instr_id = unique(dtc$transmitter_instr_id), rt_distance_m = rt_distance_m, tbin = pred_time)
+  predicted_data[bounds, event := event, on = .(tbin >= start, tbin <= end)]
+  predicted_data <- predicted_data[!is.na(event),]
+  predicted_data[, tbin := as.numeric(tbin)]
+  predicted_data[, transmitter_instr_idF := as.factor(transmitter_instr_id)]
+
+  # actual data- by tbin
+  real <- dtc[tbin %in% pred_time,]
+  #real <- dtc
+  real[, datetime_f := as.factor(tbin)]
+
+  
+  # define inverse link function
+  ilink <- family(mod)$linkinv
+
+  # make prediction (on non-back-transformed data)
+  fit <-  predict(mod, newdata = predicted_data, se.fit = TRUE, type = "link")
+  
+  # calculate +- 2 SE
+  predicted_data[, `:=`(fit_link = fit$fit, se_link = fit$se.fit)] 
+  predicted_data[, `:=`(fit_resp = ilink(fit_link), fit_upr = ilink(fit_link + (2 * se_link)), fit_lwr = ilink(fit_link - (2 * se_link)))]
+  predicted_data[, `:=`(tbin = as.POSIXct(tbin, origin = '1970-01-01 00:00:00', tz = "UTC"))]
+  setkey(predicted_data, transmitter_instr_id, tbin)
+  predicted_data[, datetime_f := as.factor(tbin)]
+
+##   #make plot
+pl <- ggplot(predicted_data, aes(x = rt_distance_m, y = fit_resp, group = transmitter_instr_idF)) +
+    geom_line(aes(color = transmitter_instr_idF), size = 1, show.legend = TRUE) + 
+  geom_ribbon(data = predicted_data, aes(x = rt_distance_m, ymin = fit_lwr, ymax = fit_upr, group = transmitter_instr_idF), alpha = 0.2, show.legend = FALSE, ) +
+  
+    #    facet_wrap(vars(transmitter_instr_model)) +
+    scale_x_continuous(limits = c(0, limit_dist_m)) +
+    scale_y_continuous(limits = c(0,1)) +
+#    geom_point(data = real, aes(x = rt_distance_m, y = dtc_prob), color = "black") +
+    labs(x = "receiver-tag distance", y = "detection prob") +
+  scale_color_viridis_d()
+
+  pdf(out_pth)
+  print(pl)
+  dev.off()
+
+  return(out_pth)
+}
+
+
+
+
+##################
+#self_dtc plot
+
+self_dtc <- function(dta, out_pth = "output/self_dtc_180.pdf"){
+
+  pdf(out_pth)
+  plot(dtc_prob ~ tbin, data = dta, pch = 16, col = "red", las = 1, xlab = "time", ylab = "detection probability (bin = 5 minutes)", ylim = c(0,3))
+  dev.off()
+  
+  return(out_pth)
+}
+
+
+                       
 
 
