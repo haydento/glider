@@ -205,34 +205,16 @@ list(
  ),
 
  tar_target(
-   discrete_dtc_prob,
-   .discrete_dtc_prob(gear_log = hst, dta = vrl_vem_combined_dtc, bsize = 60, glider_geo = glider_trk, bounds = data_bounds),
-   format = "fst_dt"
+   mission_data_summary,
+   file_abacus(dtc = clean_mission, out_pth = "output/mission_data_operating.pdf"),
+   format = "file"
  ),
 
- ## tar_target(
- ##   discrete_HB,
- ##   discrete_rng_crv(dtc = discrete_dtc_prob, trial = 1, out_pth = "output/discrete_HB_69kHz.pdf", main = "Hammond Bay, 69kHz"),
- ##   format = "file"
- ## ),
-
- ## tar_target(
- ##   discrete_SB,
- ##   discrete_rng_crv(dtc = discrete_dtc_prob, trial = 2, out_pth = "output/discrete_SB_69kHz.pdf", main = "Saginaw Bay, 69kHz"),
- ##   format = "file"
- ## ),
-
- ## tar_target(
- ##   mission_data_summary,
- ##   file_abacus(dtc = clean_mission, out_pth = "output/mission_data_operating.pdf"),
- ##   format = "file"
- ## ),
-
- ## tar_target(
- ##   science_data_summary,
- ##   file_abacus(dtc = clean_sci, out_pth = "output/science_data_operating.pdf"),
- ##   format = "file"
- ## ),
+ tar_target(
+   science_data_summary,
+   file_abacus(dtc = clean_sci, out_pth = "output/science_data_operating.pdf"),
+   format = "file"
+ ),
 
  tar_target(
    data_bounds,
@@ -287,26 +269,159 @@ tar_target(
   .load_glider(in_pth = full_glider_raw),
   format = "fst_dt"
 ),
+####################################3############################
+# V13-H/L- stationary tags detected by mobile receiver on glider
+ tar_target(
+   discrete_dtc_prob_V13_static_tag_mobile_glider,
+   .discrete_dtc_prob(gear_log = hst,
+                      dta = vrl_vem_combined_dtc,
+                      bsize = 120,
+                      glider_geo = glider_trk,
+                      bounds = data_bounds,
+                      tags = c("A69-1604-32405", "A69-1604-32401", "A69-1604-32402", "A69-1604-32406"),
+                      recs = "457003",
+                      trial = 2),
+   format = "fst_dt"
+ ),
 
-# fits GAM with tensor smooth on rt distance and date to specified tag-receiver combination and trial.  Input data is discrete number of tag detections.  This target fits model to only SB data for stationary tag 61650 and glider receiver (mobile) 458000
+# V13-H/L- stationary tags detected by mobile receiver on glider
 tar_target(
-  discrete_gam_SB,
-  .discrete_gam(dtc = discrete_dtc_prob, trial = 2, rec = c("458000"), trans = "A180-1702-61650"),
+  discrete_gam_V13_static_tag_mobile_glider,
+  .discrete_gam(dtc = discrete_dtc_prob_V13_static_tag_mobile_glider),
   format = "rds"
 ),
 
+
+# V13-H/L- stationary tags detected by mobile receiver on glider
 tar_target(
-  discrete_model_predictions_SB,
-  .discrete_rng_crv(dtc = discrete_dtc_prob,
-                    mod = discrete_gam_SB,
-                    trial = 2,
-                    trans = "A180-1702-61650",
-                    rec = c("458000"),
-                    limit_dist_m = 750,
+  discrete_model_predictions_V13_static_tag_mobile_glider,
+  .discrete_rng_crv_by(dtc = discrete_dtc_prob_V13_static_tag_mobile_glider,
+                    mod = discrete_gam_V13_static_tag_mobile_glider,
+                    limit_dist_m = 3000,
                     bounds = data_bounds,
-                    out_pth = "output/model_pred_discrete_SB.pdf"
+                    out_pth = "output/static_tag_mobile_rec_69.pdf"
                     ),
+  format = "file" ),
+####################################################################3
+# V13-H/L- stationary recs detected mobile tag on glider
+ tar_target(
+   discrete_dtc_prob_V13_static_rec_mobile_tag,
+   .discrete_dtc_prob(gear_log = hst,
+                      dta = vrl_vem_combined_dtc,
+                      bsize = 120,
+                      glider_geo = glider_trk,
+                      bounds = data_bounds,
+                      tags = c("A69-1604-32403", "A69-1604-32404"),
+                      recs = c("480026", "480027", "483814", "483815", "483829", "483846", "483868", "483871", "483884", "483888"),
+                      trial = 2),
+   format = "fst_dt"
+ ),
+
+# V13-H/L- stationary recs detected mobile tag on glider
+tar_target(
+  discrete_gam_V13_static_rec_mobile_tag,
+  .discrete_gam(dtc = discrete_dtc_prob_V13_static_rec_mobile_tag),
   format = "rds"
+),
+
+
+# V13-H/L- stationary recs detected mobile tag on glider
+tar_target(
+  discrete_model_predictions_V13_static_rec_mobile_tag,
+  .discrete_rng_crv_by(dtc =  discrete_dtc_prob_V13_static_rec_mobile_tag,
+                    mod = discrete_gam_V13_static_rec_mobile_tag,
+                    limit_dist_m = 3000,
+                    bounds = data_bounds,
+                    out_pth = "output/static_rec_mobile_tag_69.pdf"
+                    ),
+  format = "file" ),
+######################################################################
+# V9- stationary tags detected by mobile receiver on glider
+ tar_target(
+   discrete_dtc_prob_V9_static_tag_mobile_glider,
+   .discrete_dtc_prob(gear_log = hst,
+                      dta = vrl_vem_combined_dtc,
+                      bsize = 60,
+                      glider_geo = glider_trk,
+                      bounds = data_bounds,
+                      tags = c("A180-1702-61650", "A180-1702-61651"),
+                      recs = "458000",
+                      trial = 2),
+   format = "fst_dt"
+ ),
+
+# V9- stationary tags detected by mobile receiver on glider
+# did not converge? need to bump up iterations in gam process...
+tar_target(
+  discrete_gam_V9_static_tag_mobile_glider,
+  .discrete_gam(dtc = discrete_dtc_prob_V9_static_tag_mobile_glider),
+  format = "rds"
+),
+
+
+# V9- stationary tags detected by mobile receiver on glider
+tar_target(
+  discrete_model_predictions_V9_static_tag_mobile_glider,
+  .discrete_rng_crv_by(dtc = discrete_dtc_prob_V9_static_tag_mobile_glider,
+                    mod = discrete_gam_V9_static_tag_mobile_glider,
+                    limit_dist_m = 800,
+                    bounds = data_bounds,
+                    out_pth = "output/static_tag_mobile_rec_180.pdf"
+                    ),
+  format = "file" ),
+####################################################################3
+# V9- stationary recs detect mobile tag on glider
+ tar_target(
+   discrete_dtc_prob_V9_static_rec_mobile_tag,
+   .discrete_dtc_prob(gear_log = hst,
+                      dta = vrl_vem_combined_dtc,
+                      bsize = 60,
+                      glider_geo = glider_trk,
+                      bounds = data_bounds,
+                      tags = c("A180-1702-61652"),
+                      recs = c("300813", "300815"),
+                      trial = 2),
+   format = "fst_dt"
+ ),
+
+# V9- stationary recs detect mobile tag on glider
+tar_target(
+  discrete_gam_V9_static_rec_mobile_tag,
+  .discrete_gam(dtc =  discrete_dtc_prob_V9_static_rec_mobile_tag),
+  format = "rds"
+),
+
+
+# V9- stationary recs detect mobile tag on glider
+tar_target(
+  discrete_model_predictions_V9_static_rec_mobile_tag,
+  .discrete_rng_crv_by(dtc =  discrete_dtc_prob_V9_static_rec_mobile_tag,
+                    mod = discrete_gam_V9_static_rec_mobile_tag,
+                    limit_dist_m = 800,
+                    bounds = data_bounds,
+                    out_pth = "output/static_rec_mobile_tag_180.pdf"
+                    ),
+  format = "file" ),
+
+#######################################################################
+# V9- 180 kHz self-detections
+ tar_target(
+   discrete_self_dtc_180,
+   .discrete_dtc_prob(gear_log = hst,
+                      dta = vrl_vem_combined_dtc,
+                      bsize = 300,
+                      glider_geo = glider_trk,
+                      bounds = data_bounds,
+                      tags = c("A180-1702-61652"),
+                      recs = c("458000"),
+                      trial = 2),
+   format = "fst_dt"
+ ),
+
+tar_target(
+  self_dtc_plot,
+  self_dtc(dta = discrete_self_dtc_180, out_pth = "output/self_dtc_180.pdf"),
+  format = "file"
 )
 
 )
