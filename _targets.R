@@ -57,7 +57,7 @@ list(
   tar_target(
     clean_vem_status, #operating info from glider receivers
     read_vem(vem_data)$status,
-    format = "fst_dt"
+    format = "fst_dt"q
   ),
 
   # match detections to location based of glider.  Uses linear interpolation.
