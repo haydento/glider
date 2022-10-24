@@ -992,7 +992,7 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
 
 
 .discrete_dtc_prob <- function(gear_log = hst, dta = vrl_vem_combined, bsize = 3600, glider_geo, bounds, tags, recs, trial ){
-
+  
   # copy hst
   hst1 <- copy(gear_log)
   set(hst1, j = "freq", value = as.character(hst1$freq))
@@ -1132,7 +1132,7 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
 
 #' .discrete_rng_crv(dtc, mod, limit_dist_m = 2000, bounds = data_bounds, out_pth = "output/model_pred_discrete.pdf")
               
-.discrete_rng_crv <- function(dtc, mod, out_pth, limit_dist_m, bounds){
+.discrete_rng_crv <- function(dtc, mod, out_pth, limit_dist_m, bounds, tle){
 
 #  foo <- dtc[transmitter_instr_id %in% trans & receiver_serial_no %in% as.character(rec) & receiver_run %in% trial,]
 #  setkey(dtc, receiver_run, rt_distance_m)
@@ -1183,13 +1183,10 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
     scale_x_continuous(limits = c(0, limit_dist_m)) +
     scale_y_continuous(limits = c(0,1)) +
     geom_point(data = real, aes(x = rt_distance_m, y = dtc_prob), color = "black") +
-    labs(title = paste0("tags: ", unique(dtc$transmitter_instr_id)),
-         subtitle = paste0(", recs: ", dtc$receiver_serial_no),
-         x = "receiver-tag distance",
-         y = "detection prob") +
+    labs(title = tle, x = "receiver-tag distance", y = "detection prob") +
   scale_color_viridis_d()
 
-  pdf(out_pth)
+  png(out_pth)
   print(pl)
   dev.off()
 
@@ -1295,19 +1292,20 @@ file_abacus <- function(dtc = clean_mission, out_pth){
 
 #############################
 #' @examples
-#' tar_load(discrete_dtc_prob)
-#' dtc <- discrete_dtc_prob
+#' tar_load(discrete_dtc_prob_V9_static_rec_mobile_tag)
+#' dtc <- discrete_dtc_prob_V9_static_rec_mobile_tag
 #' tar_load(discrete_gam)
 #' mod <- discrete_gam
 #' out_pth = "output/tst.png"
 #' limit_dist_m = 1000
 #' tar_load(data_bounds)
 #' bounds = data_bounds
+#' tle = "title of plot"
 
 #' .discrete_rng_crv(dtc, mod, limit_dist_m = 2000, bounds = data_bounds, out_pth = "output/model_pred_discrete.pdf")
 
 
-.discrete_rng_crv_by <- function(dtc, mod, out_pth, limit_dist_m, bounds){
+.discrete_rng_crv_by <- function(dtc, mod, out_pth, limit_dist_m, bounds, tle){
  
   rt_distance_m = seq(min(dtc$rt_distance_m, na.rm = TRUE), limit_dist_m, length.out = 500)
 
@@ -1338,6 +1336,8 @@ file_abacus <- function(dtc = clean_mission, out_pth){
 
   # make prediction (on non-back-transformed data)
   fit <-  predict(mod, newdata = predicted_data, se.fit = TRUE, type = "link")
+
+  
   
   # calculate +- 2 SE
   predicted_data[, `:=`(fit_link = fit$fit, se_link = fit$se.fit)] 
@@ -1345,28 +1345,25 @@ file_abacus <- function(dtc = clean_mission, out_pth){
   predicted_data[, `:=`(tbin = as.POSIXct(tbin, origin = '1970-01-01 00:00:00', tz = "UTC"))]
   setkey(predicted_data, transmitter_instr_id, tbin)
   predicted_data[, datetime_f := as.factor(tbin)]
+  setnames(predicted_data, "transmitter_instr_idF", "tag")
 
-##   #make plot
-pl <- ggplot(predicted_data, aes(x = rt_distance_m, y = fit_resp, group = transmitter_instr_idF)) +
-    geom_line(aes(color = transmitter_instr_idF), size = 1, show.legend = TRUE) + 
-  geom_ribbon(data = predicted_data, aes(x = rt_distance_m, ymin = fit_lwr, ymax = fit_upr, group = transmitter_instr_idF), alpha = 0.2, show.legend = FALSE, ) +
-  
+  pl <- ggplot(predicted_data, aes(x = rt_distance_m, y = fit_resp, group = tag)) +
+    geom_line(aes(color = tag), size = 1, show.legend = TRUE) + 
+    geom_ribbon(data = predicted_data, aes(x = rt_distance_m, ymin = fit_lwr, ymax = fit_upr, group = tag), alpha = 0.2, show.legend = FALSE, ) +
+    
     #    facet_wrap(vars(transmitter_instr_model)) +
     scale_x_continuous(limits = c(0, limit_dist_m)) +
     scale_y_continuous(limits = c(0,1)) +
-#    geom_point(data = real, aes(x = rt_distance_m, y = dtc_prob), color = "black") +
-    labs(x = "receiver-tag distance", y = "detection prob") +
-  scale_color_viridis_d()
-
-  pdf(out_pth)
+    #    geom_point(data = real, aes(x = rt_distance_m, y = dtc_prob), color = "black") +
+    labs(title = tle, x = "receiver-tag distance", y = "detection prob") +
+    scale_color_viridis_d()
+  
+  png(out_pth)
   print(pl)
   dev.off()
-
+  
   return(out_pth)
 }
-
-
-
 
 ##################
 #self_dtc plot
@@ -1380,7 +1377,39 @@ self_dtc <- function(dta, out_pth = "output/self_dtc_180.pdf"){
   return(out_pth)
 }
 
+##############################3
+#' @title Identify missing data in VEM data from status records
+#' @param vem parsed vem status information
 
-                       
+#' @examples
+#' tar_load(clean_vem_status)
+#' vem = clean_vem_status
+
+
+## missing_vem <- function(vem){
+
+#  setDT(vem)
+#  x <- copy(vem)
+
+#  setkey(x, serial_no, datetime)
+#  x[, to_ts := data.table::shift(datetime, type = "lead"), by = .(serial_no)]
+#  x[, ts_diff := to_ts - datetime]
+
+#  x[ts_diff >60, flg := "red"]
+#  x[ts_diff <=60 | is.na(ts_diff), flg := "black"]
+
+
+#  plot(ts_diff ~ datetime, data = x[serial_no == '457003',], bg = flg, pch = 21)
+
+
+
+  
+  
+  
+  
+  
+
+
+
 
 

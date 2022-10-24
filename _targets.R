@@ -1,5 +1,7 @@
 library(targets)
 library(tarchetypes)
+library(data.table)
+library(tibble)
 source("src/functions.R")
 source("src/vem.R")
 
@@ -7,13 +9,14 @@ tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "l
 
 list(
 
+  # link to decimated science data
   tar_target(
     sci_data,
-    #    list.files("data/glider_decimated/science", full.names = TRUE),
     "data/glider_decimated/science",
     format = "file"
   ),
 
+  # link to decimated mission data
   tar_target(
     mission_data,
     "data/glider_decimated/mission",
@@ -21,49 +24,57 @@ list(
     format = "file"
   ),
 
+  # formats science data
   tar_target(
     clean_sci,
     clean(pth = sci_data, lat = m_gps_lat, lon = m_gps_lon),
     format = "fst_dt"
   ),
 
+  # formats mission data
   tar_target(
     clean_mission,
     clean(pth = mission_data, lat = m_gps_lat, lon = m_gps_lon),
     format = "fst_dt"
   ),
 
+  # combine mission data and science data into single object.  This represents decimated data collected by glider and reported via satellite uplink.
   tar_target(
     glider_trk,
     combine(x = clean_mission, y = clean_sci, id = trial_id),
     format = "fst_dt"
   ),
-  
+
+  # path to VEM data.  All files are there now.  Confirmed on 2022-10-21, got vem files from cailin in email.
   tar_target(
     vem_data,
     "data/vem",
     format = "file"
   ),
-  
+
+  # read VEM status files, parse, and clean-up
+  # this object contains the receiver operating status info for the glider only
   tar_target(
     clean_vem_status, #operating info from glider receivers
     read_vem(vem_data)$status,
     format = "fst_dt"
   ),
 
-  #all glider detections with interpolated lat/lon.look here for fish detections
+  # match detections to location based of glider.  Uses linear interpolation.
   tar_target(
     clean_vem_detections, 
     infer_detection_locations(read_vem(vem_data)$detections, glider_trk),
     format = "fst_dt"
   ),
 
+  # combine stationary receiver detections (vrl) with detections that have interpolated postions from glider receiver (vem)
   tar_target(
     vrl_vem_combined,
     rbind(dtc_geo, clean_vem_detections, fill = TRUE),
     format = "fst_dt"
     ),
-  
+
+  # path to instrument deployment/recovery locations and operating specs
   tar_target(
     instr_deploy_data,
     "data/instr_deploy_log/gear_deployment_log.csv",
@@ -71,14 +82,16 @@ list(
   ),  
 
   # detections from vrl and vem combined
-  # "big joins"- joins receiver and tag location information with detection
+  # "big joins"- joins receiver and tag location information with detection data
+  # Creates a "to-from" type dataset where tag transmissions are linked to receivers and each tag and receiver mooring type is included.
+  # contains data for both HBBS and Sag Bay trials
   tar_target( 
     vrl_vem_combined_dtc,
     get_instr_data(dta = vrl_vem_combined, hst_l = hst),
     format = "fst_dt"
   ),
 
-  
+  # pulls together visualization of glider track, tag transmissions, and detections.  Output is in docs/index.html and is on github pages at https://haydento.github.io/glider/
   tar_target(
     glider_leaflet,
     leaflet_map(glider_track = glider_trk, dtc = vrl_vem_combined_dtc, 
@@ -86,24 +99,28 @@ list(
     format = "file"
   ),
 
+  # path to vrl data downloaded from static receivers
   tar_target(
     vrl_data,
     "data/vrl/VRL",
     format = "file"
   ),
 
+  # list of paths to vrl files for both HB and SB trial
   tar_target(
     vdat_csv,
     extract_vrl(in_pth = vrl_data, out_dir = "data/vdat_csv", vdat_pth = "/home/todd/tools"),
     format = "file"
   ),
 
+  # Detections from all stationary receivers
   tar_target(
     dtc,
     compile_dtc(fls = vdat_csv),
     format = "fst_dt"
   ),
 
+  # Adds lat/lon to stationary receivers.  Information for stationary receivers is in "hst"
   tar_target(
     dtc_geo,
     stationary_recs_geo(vrl = dtc, hst_l = hst),
@@ -116,25 +133,32 @@ list(
   ##   format = "file"
   ## ),
 
+  # cleaned-up instrument log
   tar_target(
     hst,
     hst_clean(hst_l = instr_deploy_data),
     format = "fst_dt"
   ),
 
+  # path to glider trial start-end dates csv document
   tar_target(
     glider_trial,
     "data/range_trial/range_trial_dates.csv",
     format = "file"
   ),
 
+  # Formats glider trial information
   tar_target(
     trial_id,
     trial_parser(pth = glider_trial),
     format = "fst_dt"
   ),
 
+  # renders summary document of detection. (output/dtc_summary.html)
+  # shows number of detections from STATIONARY tags detected by MOBILE glider
   tar_render(dtc_summary, "src/dtc_table.rmd", output_dir = "output", output_file = "dtc_summary.html"),
+
+  # prep detection summary document data
   tar_target(
     dtc_summary_clean,
     .dtc_summary(raw_data = vrl_vem_combined_dtc),
@@ -192,30 +216,35 @@ list(
  ##   format = "file"
  ## ),
 
+  # this shows when we have detection data in hand, based on detection of tags on glider (self-detection)
  tar_target( # receiver abacus for HB
    receiver_abacus_HB,
    receiver_abacus(dtc = vrl_vem_combined_dtc, hst = hst, trial = 1, out_pth = "output/rec_abacus_HB.pdf", main = "Hammond Bay receiver detections", bounds = data_present),
    format = "file"
  ),
 
- tar_target( # receiver abacus for SB
+ # receiver abacus for SB- shows when detections are missing.  Saginaw Bay appears to be complete but HB is NOT
+ tar_target( 
    receiver_abacus_SB,
    receiver_abacus(dtc = vrl_vem_combined_dtc, hst = hst, trial = 2, out_pth = "output/rec_abacus_SB.pdf", main = "Saginaw Bay receiver detections", bounds = data_present),
    format = "file"
  ),
 
+ # mission data operation periods
  tar_target(
    mission_data_summary,
    file_abacus(dtc = clean_mission, out_pth = "output/mission_data_operating.pdf"),
    format = "file"
  ),
 
+ # science data operation periods
  tar_target(
    science_data_summary,
    file_abacus(dtc = clean_sci, out_pth = "output/science_data_operating.pdf"),
    format = "file"
  ),
 
+ # data boundaries
  tar_target(
    data_bounds,
    .data_bounds(dtc = clean_mission),
@@ -269,6 +298,9 @@ tar_target(
   .load_glider(in_pth = full_glider_raw),
   format = "fst_dt"
 ),
+
+# this is good below!!!!
+
 ####################################3############################
 # V13-H/L- stationary tags detected by mobile receiver on glider
  tar_target(
@@ -299,7 +331,8 @@ tar_target(
                     mod = discrete_gam_V13_static_tag_mobile_glider,
                     limit_dist_m = 3000,
                     bounds = data_bounds,
-                    out_pth = "output/static_tag_mobile_rec_69.pdf"
+                    out_pth = "output/static_tag_mobile_rec_69.png",
+                    tle = "mobile receiver, V13 stationary tags"
                     ),
   format = "file" ),
 ####################################################################3
@@ -332,7 +365,8 @@ tar_target(
                     mod = discrete_gam_V13_static_rec_mobile_tag,
                     limit_dist_m = 3000,
                     bounds = data_bounds,
-                    out_pth = "output/static_rec_mobile_tag_69.pdf"
+                    tle = "stationary receiver, V13 mobile tag",
+                    out_pth = "output/static_rec_mobile_tag_69.png"
                     ),
   format = "file" ),
 ######################################################################
@@ -366,7 +400,8 @@ tar_target(
                     mod = discrete_gam_V9_static_tag_mobile_glider,
                     limit_dist_m = 800,
                     bounds = data_bounds,
-                    out_pth = "output/static_tag_mobile_rec_180.pdf"
+                    out_pth = "output/static_tag_mobile_rec_180.png",
+                    tle = "mobile receiver, V9-180 stationary tags"
                     ),
   format = "file" ),
 ####################################################################3
@@ -399,7 +434,8 @@ tar_target(
                     mod = discrete_gam_V9_static_rec_mobile_tag,
                     limit_dist_m = 800,
                     bounds = data_bounds,
-                    out_pth = "output/static_rec_mobile_tag_180.pdf"
+                    out_pth = "output/static_rec_mobile_tag_180.png",
+                    tle = "stationary receiver, V9-180 mobile tag"
                     ),
   format = "file" ),
 
@@ -428,3 +464,4 @@ tar_target(
 
 
 
+###########################3
