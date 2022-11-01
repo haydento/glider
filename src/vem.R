@@ -189,6 +189,64 @@ infer_detection_locations <- function(dtc, pos){
                               ties = "ordered")$y)]
 }
 
+#' @title interpolates multiple columns of data.
+#' @description Function uses linear interpolation to estimate limnological data collected by the glider at the time that a detection is logged on the glider.  Function uses the full processed dataset.  Full processed glider data is estimated at a minimum  of second resolution when glider is underwater.  This function aligns sensor data from the glider with detections logged by the glider
+#'
+#' @param i_cols character vector of glider data that will be interpolated at  time stamp of detection
+#' @param in_time input time corresponding to when the limnological data were logged by glider
+#' @param pos Full glider dataset containing timestamps and limnological data for the glider
+#' @param dtc cleaned up glider detection file.  Detections are from the glider receiver only and are offloaded as .VEM files
+#' @param dtc_timestamp detection timestamp that glider data defined in i_cols is interpolated for
+
+#' @return function returns a detection dataset (input as parameter dtc) with interpolated data (specified in i_cols) as new columns. 
+
+#' @examples
+#' tar_load(full_glider)
+#' pos <- full_glider
+#' tar_load(clean_vem_detections)
+#' dtc <- clean_vem_detections
+#' in_time <- "precise_time_utc"
+#' i_cols <- c("precise_lon", "precise_lat")
+#' dtc_timestamp <- "datetime"
+
+#' tst <- infer_detection_locations_multi(i_cols = c("precise_lon", "precise_lat"), in_time = "precise_time_utc", pos = full_glider, dtc = clean_vem_detections, dtc_timestamp = datetime)
+
+
+infer_detection_locations_multi <- function(i_cols = c("precise_lon", "precise_lat"), in_time = "precise_time_utc",  pos = full_glider, dtc = clean_vem_detections, dtc_timestamp){
+  
+  multi_approx <- function(a,z, pos, dtc, dtc_timestamp){
+    approx(x = pos[[z]][!is.na(pos[[a]])],
+           y = pos[[a]][!is.na(pos[[a]])],
+           xout = dtc[[dtc_timestamp]],
+           ties = "ordered")$y  
+  }
+
+  foo <- as.data.table(sapply(X = i_cols, FUN = multi_approx, z = in_time, pos = pos, dtc = dtc, dtc_timestamp = dtc_timestamp, simplify = FALSE, USE.NAMES = TRUE))
+
+  out <- cbind(dtc, foo)
+ # setnames(out, c("precise_lon", "precise_lat", "water_depth (m)"), c("lat_dd", "lon_dd", "water_depth_m"))
+  
+}
+
+  ######
+  # compare this with interpolation of glider data to times of 
+## tar_load(full_glider)
+## tar_load(clean_vem_detections)
+  
+##   f_glide <- full_glider[, c("run", "trajectory", "wmo_id", "profile_id", "time_UTC", "latitude", "longitude", "depth_m", "backscatter_m-1_sr-1", "cdom_ppb", "chlorophyll_ug_l", "conductivity_S_m-1", "density_kg_m-3", "dissolved_oxygen_%", "m_depth_m", "m_water_depth_m", "precise_lat", "precise_lon", "precise_time_utc", "pressure_bar", "rinkoii_temperature_C", "salinity_1", "sci_flur_units_ppb", "source_file", "temperature_C", "u_m_s-1", "v_m_s-1", "water_depth (m)")]
+
+
+## f_glide <- f_glide[, c("run", "trajectory", "precise_time_utc", "precise_lat", "precise_lon")]
+## f_glide[, precise_time_utc2 := precise_time_utc]
+## vem_dtc <- clean_vem_detections[, c("datetime", "transmitter_id", "transmitter_id")]
+## vem_dtc[, datetime2 := datetime]
+## tst <- f_glide[vem_dtc, on = .(precise_time_utc = datetime), roll = "nearest"]
+## tst[, diff := datetime2 - precise_time_utc2 ]
+
+## ######################################
+
+
+
 
 #' Add info about tags and receivers from instr log to clean_vem_detections
 #' 
@@ -197,11 +255,12 @@ infer_detection_locations <- function(dtc, pos){
 #' @param hst instrument history log (tag and reciever metadata)
 #' 
 #' @examples
-#' targets::tar_load("vrl_vem_combined")
-#' dta <- vrl_vem_combined
+#' targets::tar_load("all_dtc")
+#' dta <- all_dtc
 #' 
 #' targets::tar_load("hst")
 #' hst_l <- hst
+
 
 get_instr_data <- function(dta, hst_l){
     
@@ -210,7 +269,6 @@ get_instr_data <- function(dta, hst_l){
   hst <- data.table::as.data.table(hst_l)
   
   # Rename all dtc cols to transmitter_, receiver_, glider_ col names
-  
   # recievers
   rec_col_names <- c("serial_no", "frequency", "noise_level_db",
                               "channel", "source_file")
@@ -226,9 +284,9 @@ get_instr_data <- function(dta, hst_l){
   dtc[, transmitter_instr_id := paste0(transmitter_code_space, "-",
                                         transmitter_id),
        by = c("transmitter_code_space", "transmitter_id")]
-  
+ 
   # glider
-  gld_col_names <- c("lon_dd", "lat_dd", "m_depth")
+  gld_col_names <- c("precise_lon", "precise_lat", "water_depth (m)", "receiver_source_file", "receiver_channel", "pressure_bar", "rinkoii_temperature_C", "salinity_1", "sci_flur_units_ppb", "temperature_C", "u_m_s-1", "v_m_s-1")
   data.table::setnames(dtc, gld_col_names, paste0("glider_", gld_col_names))    
   
   
@@ -268,9 +326,9 @@ get_instr_data <- function(dta, hst_l){
                                  transmitter_instr_id = transmitter_instr_id),
                   list(datetime = x.datetime, 
                        receiver_serial_no, 
-                       receiver_channel,
+                       glider_receiver_channel,
                        receiver_frequency,
-                       receiver_source_file,
+                       glider_receiver_source_file,
                        receiver_noise_level_db,
                        transmitter_run_id,
                        transmitter_run,
@@ -290,12 +348,20 @@ get_instr_data <- function(dta, hst_l){
                        transmitter_comment,
                        transmitter_sensor_value_adc,
                        transmitter_signal_level_db,
-                       glider_lon_dd,
-                       glider_lat_dd,
-                       glider_m_depth
+                       `glider_water_depth (m)`,
+                       glider_precise_lon,
+                       glider_precise_lat,
+                       glider_pressure_bar,
+                       glider_rinkoii_temperature_C,
+                       glider_salinity_1,
+                       glider_sci_flur_units_ppb,
+                       glider_temperature_C,
+                       `glider_u_m_s-1`,
+                       `glider_v_m_s-1`
                        ), nomatch = NULL]
   
-
+# setnames(out, c("precise_lon", "precise_lat", "water_depth (m)"), c("lat_dd", "lon_dd", "water_depth_m"))
+ 
   # STEP 2. Non equi join hst_rec with dtc by transmitter id, datetime
   
   dtc2 <- dtc2[hst_rec, on = list(datetime >= receiver_timestamp_start_utc,
@@ -309,9 +375,7 @@ get_instr_data <- function(dta, hst_l){
                        receiver_mooring_type,
                        receiver_instr_model,
                        receiver_serial_no, 
-                       receiver_channel,
                        receiver_freq,
-                       receiver_frequency,
                        receiver_latitude,
                        receiver_longitude,
                        receiver_water_depth,
@@ -320,7 +384,6 @@ get_instr_data <- function(dta, hst_l){
                        receiver_timestamp_start_utc,
                        receiver_timestamp_end_utc,
                        receiver_comment,
-                       receiver_source_file,
                        receiver_noise_level_db,
                        transmitter_run_id,
                        transmitter_run,
@@ -340,30 +403,33 @@ get_instr_data <- function(dta, hst_l){
                        transmitter_comment,
                        transmitter_sensor_value_adc,
                        transmitter_signal_level_db,
-                       glider_lon_dd,
-                       glider_lat_dd,
-                       glider_m_depth
-                       ), nomatch = NULL]  
+                       `glider_water_depth (m)`,
+                       glider_pressure_bar,
+                       glider_rinkoii_temperature_C,
+                       glider_salinity_1,
+                       glider_sci_flur_units_ppb,
+                       glider_temperature_C,
+                       `glider_u_m_s-1`,
+                       `glider_v_m_s-1`,
+                       glider_precise_lon,
+                       glider_precise_lat
+                       ), nomatch = NULL]
+  
+
   
   # STEP 3. Update receiver_ and transmitter_ lonlat with glider
-  
-  
   #Update receiver records with relevant from glider
   dtc2[receiver_site %in% c("mary_lou", "cormorant") & receiver_mooring_type == "mobile",
-       `:=`(receiver_latitude = glider_lat_dd,
-            receiver_longitude = glider_lon_dd,
-            receiver_water_depth = NA, #!! calc from depth + altitude
-            receiver_instr_elevation_from_bottom = NA, # !! missing from dtc
-            receiver_instr_depth_from_top = glider_m_depth
+       `:=`(receiver_latitude = glider_precise_lat,
+            receiver_longitude = glider_precise_lon,
+            receiver_water_depth = `glider_water_depth (m)`
        )]
  
   #Update transmitter records with relevant from glider
   dtc2[transmitter_site %in% c("mary_lou", "cormorant") & transmitter_mooring_type == "mobile",
-       `:=`(transmitter_latitude = glider_lat_dd,
-            transmitter_longitude = glider_lon_dd,
-            transmitter_water_depth = NA, #!! calc from depth + altitude
-            transmitter_instr_elevation_from_bottom = NA, # !! missing from dtc
-            transmitter_instr_depth_from_top = glider_m_depth
+       `:=`(transmitter_latitude = glider_precise_lat,
+            transmitter_longitude = glider_precise_lon,
+            transmitter_water_depth = `glider_precise_lon`
        )] 
   
   

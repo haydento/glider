@@ -228,22 +228,28 @@ combine <- function(x,y,id){
 #' @param glider_track combined data.table containing surface points of glider
 #' @param pth output file path (character)
 #' @examples
-#' tar_load("glider_trk")
-#' tar_load("vrl_vem_combined_dtc")
-#' tar_load("vps")
+#' tar_load("glider_limno")
+#' glider_track = glider_limno
+#' 
+#' tar_load("proc_dtc")
 #' tar_load("hst")
-#' glider_track = glider_trk
-#' dtc = vrl_vem_combined_dtc
+#' glider_track = glider_limno
+#' dtc = proc_dtc
 #' log = hst
 #' pth = "docs/index.html"
 #' v_pth = vps
 #'
 #' leaflet_map(glider_track = glider_trk, pth = "output/test.html", recs = "data/receiver_coords.fst")
 
+
+
 leaflet_map <- function(glider_track = glider_trk, 
                         dtc = vrl_vem_combined_dtc,
                         pth = "docx/index.html", log = hst){
 
+  setDT(glider_track)
+  setkey(glider_track, run, precise_time_utc)
+  
   #v_pth <- "data/vps/synthetic.positions/all.csv"
 #  vps <- data.table::fread(v_pth)
 #  set(vps, j = "Time", value = fasttime::fastPOSIXct(vps$Time))
@@ -258,9 +264,9 @@ leaflet_map <- function(glider_track = glider_trk,
   recs_SB <- unique(recs_SB, by = c("latitude", "longitude"))
 
   # HB glider
-  glider_HB <- glider_track[!(is.na(lon_dd) | is.na(lat_dd)) & run_id == 1]
+  glider_HB <- glider_track[run == 1, c("precise_lat", "precise_lon", "precise_time_utc")]
   # SB glider
-  glider_SB <- glider_track[!(is.na(lon_dd) | is.na(lat_dd)) & run_id == 2]
+  glider_SB <- glider_track[run == 2, c('precise_lat', 'precise_lon', 'precise_time_utc')]
 
   # detections of MBU_1 tags on glider (180kHz)
   dtc_180 <- dtc[(receiver_site == "cormorant" | receiver_site == "mary_lou") & receiver_freq == 180 & (transmitter_site == "MBU-001" | transmitter_site == "MBU-002"),]
@@ -324,8 +330,8 @@ leaflet_map <- function(glider_track = glider_trk,
   m <- addCircleMarkers(m, data = recs_SB, lng = ~longitude, lat = ~latitude, color = "blue", radius = 8, stroke = FALSE, fillOpacity = 1)
 
   # glider track
-  m <- addPolylines(map = m, data = glider_HB, lng = ~lon_dd, lat = ~lat_dd, color = "green")
-  m <- addPolylines(map = m, data = glider_SB, lng = ~lon_dd, lat = ~lat_dd, color = "green")
+  m <- addPolylines(map = m, data = glider_HB, lng = ~precise_lon, lat = ~precise_lat, color = "green")
+  m <- addPolylines(map = m, data = glider_SB, lng = ~precise_lon, lat = ~precise_lat, color = "green")
 
   m <- addCircleMarkers(map = m, data = dtc_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = ~color, radius = 9, stroke = FALSE, fillOpacity = 1, group = "180 kHz")
   m <- addCircleMarkers(map = m, data = MBU1_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "180 kHz")
@@ -460,7 +466,7 @@ formatter <- function(y){
 
 coords_table <- function(out_tbl){#, path = "output/juv_coords.html"){
   flex <- flextable::flextable(out_tbl)
-  flex <- flextable::fontsize(flex, part = "all", size = 12)
+  flex <- flextable::fontsize(flex, part = "all", size = 10)
   flex <- flextable::bold(flex, part = "header")
   flex <- flextable::theme_zebra(flex)
   flex <- flextable::autofit(flex)
@@ -482,9 +488,8 @@ coords_table <- function(out_tbl){#, path = "output/juv_coords.html"){
 #' @title extract dtc summary info
 #' @description create detection data summary table for report
 #' @param tbl data.table of tag detection summary info
-#' tar_load(vrl_vem_combined_dtc)
+#' tar_load()
 #' raw_data = vrl_vem_combined_dtc
-
 
 
 .dtc_summary <- function(raw_data){
@@ -738,21 +743,24 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
 
 #' @title fit varying coefficient (on transmitter frequency) to stationary tag-glider detection data
 #' @examples
-#' tar_load("glider_dtc_range")
+#' tar_load(dp_69st_mr)
 #' dtc = glider_dtc_range
 #' limit_dist_m = 3000
 #' trial_run = 2
 #' .GAMit(dtc = dtc, trial_run = 1, limit_dist_m = limit_dist_m)
 
-.GAMit <- function(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 3000){
+.GAMit <- function(dtc = glider_dtc_range, limit_dist_m = 3000, k = 10){
 
-  dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
+  dtc.i <- dtc[rt_distance_m <= limit_dist_m,]
+  
+#  mod <- gam(cbind(num_success, num_failure) ~ te(rt_distance_m, as.numeric(tbin), bs = c("cr", "cr"), by = transmitter_instr_idF, k = k), data = dtc.i, family = "binomial", method = "REML")
 
-  mod <- gam(tran_dtc ~ s(rt_distance_m, bs = "cs", by = as.factor(transmitter_instr_model)), data = dtc.i, family = "binomial")
-
+  mod <- bam(cbind(num_success, num_failure)  ~ te(rt_distance_m, as.numeric(tbin), bs = c("cr", "cr"), by = transmitter_instr_idF), data = dtc.i, family = "binomial", discrete = TRUE, method = "fREML", nthreads = 10)
+  
+#  out <- bam(cbind(success_dtc, fail_dtc) ~ te(rt_dist, bin_n, bs = c("cr", "cr"), by = tag_site_F), data = tst, family = "binomial", discrete = TRUE, method = "fREML", nthreads = 12)
+  
   return(mod)
 }
-
 
 #' @title fit varying coefficient (on transmitter frequency) to stationary tag-glider detection data
 #' @examples
@@ -760,13 +768,64 @@ glider_dtc_transmissions_time_filtered <- function(dtc, inter){
 #' dtc = glider_dtc_range
 #' limit_dist_m = 3000
 #' trial_run = 2
+#' .GAMit(dtc = dtc, trial_run = 1, limit_dist_m = limit_dist_m)
+
+
+gam_model_check <- function(x, out = "output/gam_check.pdf"){
+
+  pdf(out)
+
+  if(any(class(x) %in% c("gamm", "list"))){
+    y <- x$lme
+    z <- x$gam
+    
+    gam.check(z)
+    acf(residuals(y, type = "normalized"))
+  }
+
+  if(any(class(x) %in% c("gam", "glm", "lm"))){
+    gam.check(x)
+    acf(residuals(x))
+  }
+  dev.off()
+  return(out)
+}
+  
+
+# helper functions from Gavin Simpson for obtaining invlink function from model output (GAMM) (2022-09-16)
+  family.gamm <- function(object, ...) {
+    family(object$gam)
+  }
+
+  family.gam <- function(object, ...){
+    object$family
+  }
+
+
+
+
+.GAMMit <- function(dtc = glider_dtc_range, limit_dist_m = 3000, k = 10){
+
+  dtc.i <- dtc[rt_distance_m <= limit_dist_m,]
+  mod <- gam(cbind(num_success, num_failure) ~ s(rt_distance_m, bs = "cs", by = as.factor(transmitter_instr_id), k = k), data = dtc[rt_distance_m < limit_dist_m,], family = "binomial", method = "REML")
+
+  return(mod)
+}
+
+
+
+#' @title fit varying coefficient (on transmitter frequency) to stationary tag-glider detection data
+#' @examples
+#' tar_load(dp_69st_mr)
+#' dtc <- dp_69st_mr
+#' limit_dist_m = 3000
+#'
 #' .GAMit_tensor(dtc = dtc, trial_run = 1, limit_dist_m = limit_dist_m)
 
 .GAMit_tensor <- function(dtc = glider_dtc_range, trial_run = 1, limit_dist_m = 3000){
 
-  dtc.i <- dtc[transmitter_instr_id %in% c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406", "A180-1702-61650", "A180-1702-61651") & trial == trial_run & rt_distance_m <= limit_dist_m]
-
-mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(transmitter_instr_model)), data = dtc.i, family = "binomial")
+  dtc.i <- dtc[rt_distance_m <= limit_dist_m,]
+  mod <- gam(cbind(num_success, num_failure) ~ te(as.numeric(tbin), rt_distance_m, by = as.factor(transmitter_instr_idF)), data = dtc.i, family = "binomial")
 
   return(mod)
 }
@@ -968,18 +1027,19 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   
 
 ######################
-#' tar_load(glider_trk)
-#' glider_geo <- glider_trk  
+#' tar_load(glider_limno)
+#' glider_geo <- glider_limno  
 #' tar_load(hst)
 #' gear_log = hst
-#' tar_load(vrl_vem_combined_dtc)
-#' dta = vrl_vem_combined_dtc
-#' bsize = 3600
-#' tar_load(data_bounds)
-#' bounds = data_bounds
-#' tags = "A69-1604-32403"
-#' recs = c("480026", "480027", "483814", "483815", "483829", "483846", "483868", "483871", "483884", "483888")
+#' tar_load(proc_dtc)
+#' dta = proc_dtc
+#' bsize = 120
+#' tar_load(active_glider)
+#' bounds = active_glider
+#' tags = c("A69-1604-32405", "A69-1604-32401", "A69-1604-32402", "A69-1604-32406")
+#' recs = c("457003")
 #' trial = 2
+
 #' tst <- .discrete_dtc_prob(gear_log = hst,
 #'                      dta = vrl_vem_combined_dtc,
 #'                      bsize = 60,
@@ -988,77 +1048,119 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
 #'                      tags = "A69-1602-32403",
 #'                      recs = c("480026", "480027", "483814", "483815", "483829", "483846", "48#' 3868", "483871", "483884", "483888"), trial = 1)
 
-
-
-
-.discrete_dtc_prob <- function(gear_log = hst, dta = vrl_vem_combined, bsize = 3600, glider_geo, bounds, tags, recs, trial ){
+.discrete_dtc_prob <- function(gear_log = hst, dta = vrl_vem_combined, bsize = 3600, glider_geo, bounds, tags, recs, trial){
   
   # copy hst
   hst1 <- copy(gear_log)
   set(hst1, j = "freq", value = as.character(hst1$freq))
 
   # subset out receivers and tag information
-  dtc <- dta[transmitter_instr_id %in% tags & receiver_serial_no %in% recs & receiver_run == trial ,]
+  dtc <- dta[transmitter_instr_id %in% tags &
+               receiver_serial_no %in% recs &
+               receiver_run == trial ,]
+
+  # subset out trial from boundary object
+  bounds <- bounds[run == trial,]
   
   # range(vrl_vem_combined_dtc$datetime)
-  tseq <- seq(from = lubridate::floor_date(min(dta$datetime), unit = "day"), to = lubridate::ceiling_date(max(dta$datetime), unit = "day"), by = bsize)
+  # this uses the detection data to define min/max values for bins.
+  # I think this should be defined by min/max of bounds, associated with when glider is working and in the water.  Change made in next line.
+  tseq <- seq(from = lubridate::floor_date(min(bounds$start), unit = "day"),
+              to = lubridate::ceiling_date(max(bounds$end), unit = "day"),
+              by = bsize)
 
   # bin detections
   dtc[, tbin := tseq[findInterval(datetime, tseq)]]
 
   # create all combinations of tag, receiver, and trials. Not all of these combinations are possible but will sort  out later.
-  tag_rec_comb <- CJ(transmitter_instr_id = tags, receiver_serial_no = recs, tbin = tseq, tran_dtc = 0, unique = TRUE)
+  tag_rec_comb <- CJ(transmitter_instr_id = tags,
+                     receiver_serial_no = recs,
+                     tbin = tseq,
+                     tran_dtc = 0,
+                     unique = TRUE)
 
   # calculate locations for all tags and receivers in full combination dataset
   # how this is done depends on whether tag/receiver is moving or not...
   # do static first
   # recs separately from transmitters
 
-  rec_positions <- hst1[instr_id %in% recs, c("instr_id", "mooring_type", "timestamp_start_utc", "timestamp_end_utc", "latitude", "longitude"),]
+  rec_positions <- hst1[instr_id %in% recs,
+                        c("instr_id",
+                          "mooring_type",
+                          "timestamp_start_utc",
+                          "timestamp_end_utc",
+                          "latitude",
+                          "longitude"),]
 
-  tag_positions <- hst1[instr_id %in% tags, c("instr_id", "mooring_type", "timestamp_start_utc", "timestamp_end_utc", "latitude", "longitude"),]
+  tag_positions <- hst1[instr_id %in% tags,
+                        c("instr_id",
+                          "mooring_type",
+                          "timestamp_start_utc",
+                          "timestamp_end_utc",
+                          "latitude",
+                          "longitude"),]
 
   # join with receiver locations info.  Should not be NA if receivers are static.  Will be NA if receivers are mobile
-  tag_rec_comb[rec_positions, `:=` (receiver_mooring = mooring_type, receiver_latitude = latitude, receiver_longitude = longitude), on = .(receiver_serial_no = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
+  tag_rec_comb[rec_positions, `:=` (receiver_mooring = mooring_type,
+                                    receiver_latitude = latitude,
+                                    receiver_longitude = longitude),
+               on = .(receiver_serial_no = instr_id,
+                      tbin >= timestamp_start_utc,
+                      tbin <= timestamp_end_utc)]
 
   # repeat above with tags.
-  tag_rec_comb[tag_positions, `:=` (transmitter_mooring = mooring_type, transmitter_latitude = latitude, transmitter_longitude = longitude), on = .(transmitter_instr_id = instr_id, tbin >= timestamp_start_utc, tbin <= timestamp_end_utc)]
+  tag_rec_comb[tag_positions, `:=` (transmitter_mooring = mooring_type,
+                                    transmitter_latitude = latitude,
+                                    transmitter_longitude = longitude),
+               on = .(transmitter_instr_id = instr_id,
+                      tbin >= timestamp_start_utc,
+                      tbin <= timestamp_end_utc)]
 
   # calculate average position during time bin for mobile transmitters and receivers
-  tag_rec_comb[receiver_mooring == "mobile" | transmitter_mooring == "mobile", `:=`(glider_lon_recs = approx(x = glider_geo$time[!is.na(glider_geo$lon_dd)],
-                                      y = glider_geo$lon_dd[!is.na(glider_geo$lon_dd)],
+  tag_rec_comb[receiver_mooring == "mobile" | transmitter_mooring == "mobile",
+               `:=`(glider_lon_recs = approx(x = glider_geo$precise_time_utc[!is.na(glider_geo$precise_lon)],
+                                      y = glider_geo$precise_lon[!is.na(glider_geo$precise_lon)],
                                       xout = tbin,
                                       ties = "ordered")$y,
-                  glider_lat_recs = approx(x = glider_geo$time[!is.na(glider_geo$lat_dd)],
-                                      y = glider_geo$lat_dd[!is.na(glider_geo$lon_dd)],
+                  glider_lat_recs = approx(x = glider_geo$precise_time_utc[!is.na(glider_geo$precise_lat)],
+                                      y = glider_geo$precise_lat[!is.na(glider_geo$precise_lon)],
                                       xout = tbin,
                                       ties = "ordered")$y)]
   
-  tag_rec_comb[is.na(receiver_latitude) & receiver_mooring == "mobile", `:=` (receiver_latitude = glider_lat_recs, receiver_longitude = glider_lon_recs),]
+  tag_rec_comb[is.na(receiver_latitude) & receiver_mooring == "mobile",
+               `:=` (receiver_latitude = glider_lat_recs,
+                     receiver_longitude = glider_lon_recs),]
 
-  tag_rec_comb[is.na(transmitter_latitude) & transmitter_mooring == "mobile",  `:=` (transmitter_latitude = glider_lat_recs, transmitter_longitude = glider_lon_recs),]
+  tag_rec_comb[is.na(transmitter_latitude) & transmitter_mooring == "mobile",
+               `:=` (transmitter_latitude = glider_lat_recs,
+                     transmitter_longitude = glider_lon_recs),]
 
   # remove invalid combinations
-  tag_rec_comb <- tag_rec_comb[!is.na(receiver_latitude) & !is.na(receiver_longitude) & !is.na(transmitter_longitude) & !is.na(transmitter_latitude),]
+  tag_rec_comb <- tag_rec_comb[!is.na(receiver_latitude) &
+                                 !is.na(receiver_longitude) &
+                                  !is.na(transmitter_longitude) &
+                                  !is.na(transmitter_latitude),]
 
   # remove glider lat/lon- unneeded
   tag_rec_comb[, glider_lon_recs := NULL][, glider_lat_recs := NULL]
 
-  
-  dtc_obs <- dtc[, .(num_dtc = .N ), by = .(transmitter_instr_id, tbin, receiver_serial_no, receiver_frequency )]
+  # count number of detections in each bin for each receiver
+  dtc_obs <- dtc[, .(num_dtc = .N ),
+                 by = .(transmitter_instr_id,
+                        tbin,
+                        receiver_serial_no,
+                        receiver_freq)]
 
-  # join with all tag-receiver combinations
+  # join detections with all tag-receiver combinations when detection could have been heard.  This includes periods of time when receiver was out of water and unable to detect anything.  These will be filtered later.
   tag_rec_comb[dtc_obs, tran_dtc := num_dtc, on = .(transmitter_instr_id, tbin, receiver_serial_no) ]
 
   setkey(tag_rec_comb, transmitter_instr_id, receiver_serial_no, tbin)
 
- 
-  # add transmitter delay info
-  tag_rec_comb[hst1, tag_min_delay := tag_min_delay, on = .(transmitter_instr_id = instr_id)]
-  tag_rec_comb[hst1, tag_max_delay := tag_max_delay, on = .(transmitter_instr_id = instr_id)]
-
-  # add transmitter frequency
-  tag_rec_comb[hst1, receiver_frequency := freq, on = .(transmitter_instr_id = instr_id)]
+  # add transmitter delay info (min delay, max delay) and transmitter frequency
+  tag_rec_comb[hst1, `:=`(tag_min_delay = tag_min_delay,
+                          tag_max_delay = tag_max_delay,
+                          receiver_frequency = freq),
+               on = .(transmitter_instr_id = instr_id)]
 
   # calculate nominal delay
   tag_rec_comb[, nom_delay := ((tag_max_delay - tag_min_delay)/2) + tag_min_delay]
@@ -1066,25 +1168,39 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   # calculate expected transmissions
   tag_rec_comb[, exp_tran := bsize/nom_delay]
 
+  # if number of transmissions > expected transmissions,
+  # then make expected transmissions = detected transmissions
+  tag_rec_comb[tran_dtc >= exp_tran, exp_tran := tran_dtc]
+
   # calculate detection prob
   tag_rec_comb[, dtc_prob := tran_dtc/exp_tran]
 
-  # calculate tag-receiver distance
-  tag_rec_comb[, rt_distance_m := geosphere::distVincentyEllipsoid(p1 = cbind(receiver_longitude, receiver_latitude), p2 = cbind(transmitter_longitude, transmitter_latitude))]
+  # calculate detection probability (num of successful detections versus failed detections
+  tag_rec_comb[, num_success := tran_dtc][is.na(num_success), num_success := 0]
 
-  tag_rec_comb[bounds, event := event, on = .(tbin >= start, tbin <= end)]
+  # calculate the number of failed detections
+  tag_rec_comb[, num_failure := exp_tran - num_success]
+
+  # calculate tag-receiver distance
+  tag_rec_comb[, rt_distance_m := geosphere::distVincentyEllipsoid(p1 = cbind(receiver_longitude, receiver_latitude),
+                                                                   p2 = cbind(transmitter_longitude, transmitter_latitude))]
+
+  # Revised here to eliminate periods when glider is not active (i.e., receivers are not operating because glider is at the surface)
+  # bounds are periods of time when glider was submerged at least 1 meter.
+  tag_rec_comb[bounds, `:=`(event = yoyo,
+                            run = run),
+         on = .(tbin > start, tbin < end)]
   tag_rec_comb <- tag_rec_comb[!is.na(event),]
 
-  # get rid of first trial data
-  tag_rec_comb <- tag_rec_comb[event > 1,]
+  # organize data
 
   setkey(tag_rec_comb, transmitter_instr_id, tbin)
 
-  tag_rec_comb[, num_success := tran_dtc][is.na(num_success), num_success := 0]
-  tag_rec_comb[num_success > exp_tran, exp_tran := num_success]
-  tag_rec_comb[, num_failure := exp_tran - num_success]
+  # convert transmitter ids to factor for modelling
+  tag_rec_comb[, transmitter_instr_idF := as.factor(transmitter_instr_id)]
  
   return(tag_rec_comb)
+  
 }
 
 
@@ -1102,7 +1218,7 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   # detection probability for subset of days
   #mod <- gam(cbind(dtc$num_success, dtc$num_failure) ~ te(as.numeric(tbin), rt_distance_m), data = dtc, family = "binomial")
 
-  dtc[, transmitter_instr_idF := as.factor(transmitter_instr_id)]
+#  dtc[, transmitter_instr_idF := as.factor(transmitter_instr_id)]
   # "average" dtc prob
   mod <- gam(cbind(num_success, num_failure) ~ s(rt_distance_m, by = transmitter_instr_idF), data = dtc, family = "binomial")
 
@@ -1121,14 +1237,15 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
 #' @param bounds defines periods of time in which we have data available
 #'
 #' @examples
-#' tar_load(discrete_dtc_prob)
-#' dtc <- discrete_dtc_prob
-#' tar_load(discrete_gam)
-#' mod <- discrete_gam
+#' tar_load(dp_69st_mr)
+#' dtc <- dp_69st_mr
+#' tar_load(mod_69st_mr)
+#' mod <- mod_69st_mr
 #' out_pth = "output/tst.png"
-#' limit_dist_m = 1000
-#' tar_load(data_bounds)
-#' bounds = data_bounds
+#' limit_dist_m = 2000
+#' tar_load(active_glider)
+#' bounds = active_glider
+#' tle = "detection prob 69 kHz"
 
 #' .discrete_rng_crv(dtc, mod, limit_dist_m = 2000, bounds = data_bounds, out_pth = "output/model_pred_discrete.pdf")
               
@@ -1144,21 +1261,24 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   #pred_time <- as.numeric(seq(min(foo$tbin), max(foo$tbin), length.out = 200)
   # pred_time <- sample(unique(foo$tbin), length(unique(foo$tbin)) , replace = FALSE)
 
-  pred_time <- sample(unique(dtc$tbin), 10, replace = FALSE)
+#  pred_time <- sample(unique(dtc$tbin), 10, replace = FALSE)
   
   # to predict for all time bins...This takes forever and does a ton of overplotting!
   #   pred_time <- unique(foo$tbin)
 
   # make predicted data
-  predicted_data <- CJ(transmitter_instr_model = unique(dtc$transmitter_instr_id), rt_distance_m = rt_distance_m, tbin = pred_time)
-  predicted_data[bounds, event := event, on = .(tbin >= start, tbin <= end)]
-  predicted_data <- predicted_data[!is.na(event),]
-  predicted_data[, tbin := as.numeric(tbin)]
+  predicted_data <- CJ(transmitter_instr_id = unique(dtc$transmitter_instr_idF), rt_distance_m = rt_distance_m)
+#  predicted_data[bounds, event := yoyo, on = .(tbin >= start, tbin <= end)]
+#  tag_rec_comb[bounds, `:=`(event = yoyo, run = run), on = .(tbin >= start, tbin <= end)]
+#  tag_rec_comb <- tag_rec_comb[!is.na(event),]
+
+  #predicted_data <- predicted_data[!is.na(event),]
+  #predicted_data[, tbin := as.numeric(tbin)]
   
   # actual data- by tbin
-  real <- dtc[tbin %in% pred_time,]
+#  real <- dtc[tbin %in% pred_time,]
   #real <- dtc
-  real[, datetime_f := as.factor(tbin)]
+ # real[, datetime_f := as.factor(tbin)]
 
   
   # define inverse link function
@@ -1170,21 +1290,37 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
   # calculate +- 2 SE
   predicted_data[, `:=`(fit_link = fit$fit, se_link = fit$se.fit)] 
   predicted_data[, `:=`(fit_resp = ilink(fit_link), fit_upr = ilink(fit_link + (2 * se_link)), fit_lwr = ilink(fit_link - (2 * se_link)))]
-  predicted_data[, `:=`(tbin = as.POSIXct(tbin, origin = '1970-01-01 00:00:00', tz = "UTC"))]
-  setkey(predicted_data, transmitter_instr_model, tbin)
-  predicted_data[, datetime_f := as.factor(tbin)]
+  #predicted_data[, `:=`(tbin = as.POSIXct(tbin, origin = '1970-01-01 00:00:00', tz = "UTC"))]
+  #setkey(predicted_data, transmitter_instr_id, tbin)
+  setkey(predicted_data, transmitter_instr_id)
+#  predicted_data[, datetime_f := as.factor(tbin)]
 
   #make plot
-  pl <- ggplot(predicted_data, aes(x = rt_distance_m, y = fit_resp, group = datetime_f)) +
-    geom_line(aes(color = datetime_f), size = 1, show.legend = FALSE) + 
-#    geom_ribbon(data = predicted_data, aes(x = rt_distance_m, ymin = fit_lwr, ymax = fit_upr, color = datetime_f), alpha = 0.2, show.legend = FALSE, fill = "grey") +
   
-    #    facet_wrap(vars(transmitter_instr_model)) +
-    scale_x_continuous(limits = c(0, limit_dist_m)) +
-    scale_y_continuous(limits = c(0,1)) +
-    geom_point(data = real, aes(x = rt_distance_m, y = dtc_prob), color = "black") +
-    labs(title = tle, x = "receiver-tag distance", y = "detection prob") +
-  scale_color_viridis_d()
+  ## plot(fit_resp ~ rt_distance_m, data = predicted_data[transmitter == "A69-1604-32401",], col = col, ylim = c(0,1), xlim = c(0,2000), las = 1, type = "l")
+  ## lines(fit_resp ~ rt_distance_m, data = predicted_data[transmitter == "A69-1604-32405",], col = col)
+  ## lines(fit_resp ~ rt_distance_m, data = predicted_data[transmitter == "A69-1604-32402",], col = col)
+  ## lines(fit_resp ~ rt_distance_m, data = predicted_data[transmitter == "A69-1604-32406",], col = col)
+
+  ## polygon(predicted_data[transmitter == "A69-1604-32401",]$rt_distance_m,  predicted_data[transmitter == "A69-1604-32401",]$fit_lwr)
+
+  # change levels to make chart legend clear
+  levels(predicted_data$transmitter_instr_id) <- c("Tag 1, V13L", "Tag 1, V13H", "Tag 2, V13L", "Tag 2, V13H")
+
+  ## make grouped data for display.
+  rt_dist <- seq(0, limit_dist_m, by = 50)
+  dtc[, rt_dist_bin := rt_dist[findInterval(rt_distance_m, rt_dist)], by = .(run)]
+  foo <- dtc[, .(x_bar = mean(dtc_prob)), by = .(rt_dist_bin, transmitter_instr_idF)]
+   
+  pl <- ggplot(predicted_data, aes(x = rt_distance_m, y = fit_resp, color = transmitter_instr_id)) +
+    geom_line( size = 1, show.legend = TRUE) +
+    scale_color_viridis_d() + 
+    geom_ribbon(data = predicted_data, aes(x = rt_distance_m, ymin = fit_lwr, ymax = fit_upr), alpha = 0.2, show.legend = FALSE) +
+    scale_fill_viridis_d() +
+  scale_x_continuous(limits = c(0, limit_dist_m)) +
+  scale_y_continuous(limits = c(0,1)) +
+  geom_point(data = foo, aes(x = rt_dist_bin, y = x_bar), color = "black", show.legend = FALSE) +
+  labs(title = tle, x = "receiver-tag distance", y = "detection prob", color = "transmitter")
 
   png(out_pth)
   print(pl)
@@ -1192,13 +1328,6 @@ mod <- gam(tran_dtc ~ te(as.numeric(datetime), rt_distance_m, by = as.factor(tra
 
   return(out_pth)
   
-  ## low <- loess(dtc_prob ~ rt_distance_m, data = foo, span = 0.2)
-  ## foo[, loe_pred := predict(low, foo)]
-  ## lines(loe_pred ~ rt_distance_m, data = foo, col = "red")
-
-  ## dev.off()
-  
-  ## return(out_pth)
 }
 
 
@@ -1305,7 +1434,7 @@ file_abacus <- function(dtc = clean_mission, out_pth){
 #' .discrete_rng_crv(dtc, mod, limit_dist_m = 2000, bounds = data_bounds, out_pth = "output/model_pred_discrete.pdf")
 
 
-.discrete_rng_crv_by <- function(dtc, mod, out_pth, limit_dist_m, bounds, tle){
+.discrete_rng_crv_by <- function(dtc, mod, out_pth, limit_dist_m, tle){
  
   rt_distance_m = seq(min(dtc$rt_distance_m, na.rm = TRUE), limit_dist_m, length.out = 500)
 
@@ -1402,14 +1531,177 @@ self_dtc <- function(dta, out_pth = "output/self_dtc_180.pdf"){
 #  plot(ts_diff ~ datetime, data = x[serial_no == '457003',], bg = flg, pch = 21)
 
 
+#########################
+#' @title extract periods when glider is deeper than 1 m.  Confirmed also that this corresponds to when the receivers are active on glider.  receivers are turned off when glider is at the surface.  This is needed to identify periods when we should be detecting transmissions.  Problem is that detection probability is being calculated during periods when glider is not able to detect anything because it is at the surface and turned off.
 
+#' @return data.table with "run" (glider run, either HB or SB in 2021).  "Yoyo" is grouping var that identifies when glider is underwater.  Each time glider moves through water column is a separate profile (i.e., 0 to max depth is a separate profile from return to surface from max depth). "precise_time_utc" is reported in "start", and "end" columns.  "start" is the start of period when glider is underwater and "end" is the end of period when glider is underwater.
+
+#' @param glider Full glider object
+#' @param thresh Threshold for large intervals between timestamps that signify when glider is at surface.  This is used in combination with depth of glider
+
+#' @examples
+#' tar_load(glider_limno)
+#' glider = glider_limno
+#' thresh = 500
+
+# this function finds intervals when glider is actively listening for fish underwater
+.active_glider <- function(glider = glider_limno, thresh = 500){
+
+  # setkey
+  setkey(glider, precise_time_utc)
+
+  # interpolate glider depth
+  glider[, glide_depth_inter := approx(x = glider[!is.na(glider$m_depth_m),][["precise_time_utc"]],
+                                       y = glider[!is.na(glider$m_depth_m),][["m_depth_m"]],
+                                       xout = precise_time_utc, ties = "ordered")$y, by = .(run)]
+
+  # calculate time diff between rows
+  glider[, `:=`(time_diff, c(NA, diff(as.numeric(precise_time_utc)))), by = .(run)]
+  glider[, flg := 0]
+
+  # define new YOYO if difference between successive timestamps is greater than 500 seconds and depth is greater than 1 meter
+  # determine first and last timestamp when glider is deeper than 1 m timestamps are less than 500 seconds apart
+  glider[time_diff < thresh & glide_depth_inter >= 1, flg := 1, by = .(run)]
+  glider[, to_flg := shift(flg, type = "lead"), by = .(run)]
+  glider[, from_flg := shift(flg, type = "lag"), by = .(run)]
+  glider[, start := 0]
+  glider[, end := 0]
+  glider[flg == 1 & from_flg == 0 & to_flg == 1, start := 1]
+  glider[flg == 1 & from_flg == 1 & to_flg == 0, end := 1]
+
+  # convert to wide dataset
+  glider <- glider[start == 1 | end == 1, c("run", "profile_id", "precise_time_utc", "m_depth_m", "glide_depth_inter", "start", "end")]
+  glider[start == 1, yoyo := 1:.N, by = .(run)]
+  glider[end == 1, yoyo := 1:.N, by = .(run)]
+  glider <- dcast(glider, run + yoyo ~ start, value.var = "precise_time_utc") 
+
+  # clean-p
+  setnames(glider, c("0", "1"), c("end", "start"))
+  setcolorder(glider, c("run", "yoyo", "start", "end"))
+
+  return(glider)
+}
   
   
+#' library(htmltools)
+#' save_html(html = tar_visnetwork(), file = "output/network.html")
   
-  
-  
+## tar_load(dp_69st_mr)
+## plot(num_success/exp_tran ~ rt_distance_m, data = dp_69st_mr)
+
+## library(mgcv)
+
+##            mod <- gam(cbind(num_success, num_failure) ~ s(rt_distance_m, bs = "cs", by = as.factor(transmitter_instr_id)), data = dp_69st_mr[rt_distance_m < 3000,], family = "binomial", method = "REML")
+##            mod1 <- gam(cbind(num_success, num_failure) ~ s(rt_distance_m, bs = "cs"), data = dp_69st_mr[rt_distance_m < 3000,], family = "binomial", method = "REML")
 
 
+
+##   out <- bam(cbind(success_dtc, fail_dtc) ~ te(rt_dist, bin_n, bs = c("cr", "cr"), by = tag_site_F), data = tst, family = "binomial", discrete = TRUE, method = "fREML", nthreads = 12)
+
+
+
+#' tar_load(dp_69mt_mr)
+#' tar_load(active_glider)
+
+## active <- active_glider[run == 2,]
+
+## plot(dtc_prob ~ tbin, data =  dp_69mt_mr[transmitter_instr_id == "A69-1604-32403" & rt_distance_m < 2000,], pch = 21, col = "black", bg = "red", xlim = c(as.POSIXct("2021-10-15 00:00:00", tz = "UTC"), as.POSIXct("2021-10-16 12:00:00", tz = "UTC")))
+## points(dtc_prob ~ tbin, data = dp_69mt_mr[transmitter_instr_id == "A69-1604-32404" & rt_distance_m < 2000,], pch = 21, col = "black", bg = "blue")
+## abline(v = active$start, col = "red")
+## abline(v = active$end, col = "blue")
+
+################################################
+
+#' tar_load(mod_69st_mr)
+#' gam_mod = mod_69st_mr
+#' start_end_ts = c("2021-10-14", "2021-10-23")
+#' start_end_rt_dist = c(0,2000)
+#' t_int = 86400
+#' rt_dist_int = 100
+#' site = c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406")
+#' tar_load(dp_69st_mr)
+#' gam_dta = dp_69st_mr
+
+#' out <- predicted_dta(gam_mod = mod_69st_mr, start_end_rt_dist = c(0,3000), t_int = 86400, rt_dist_int = 100, site = c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406"), start_end_ts = c("2021-10-14", "2021-10-23")) 
+#' tar_load(dp_69st_mr)
+
+
+predicted_dta <- function(gam_mod,
+                          gam_dta,
+                          start_end_ts = c("2021-09-16", "2021-11-22"),
+                          start_end_rt_dist = c(0,500),
+                          t_int = 86400,
+                          rt_dist_int = 100,
+                          site = c("A69-1604-32401", "A69-1604-32402", "A69-1604-32405", "A69-1604-32406")){
+  
+  days <- as.POSIXct(start_end_ts, tz = "UTC")
+  days <- seq(days[1], days[2], by = t_int)
+  rt_dist <- seq(start_end_rt_dist[1], start_end_rt_dist[2], by = rt_dist_int)
+  new_dta <- data.table(CJ(rt_distance_m = rt_dist, tbin_n = as.numeric(days), transmitter_instr_idF = as.factor(site), unique = TRUE))
+  new_dta[, tbin := as.numeric(as.POSIXct(tbin_n, tz = "UTC", origin = "1970-01-01 00:00:00"))]
+
+  # make predictions in "link" units
+  nc <- 6
+  cl <- parallel::makeCluster(nc)
+  pred <- predict.gam(gam_mod, newdata = new_dta, type = "link", cluster = cl, se.fit = TRUE)
+  parallel::stopCluster(cl = cl)
+  out <- data.table(new_dta, pred = as.vector(pred$fit), se.fit = as.vector(pred$se.fit))
+
+  # calculate 2*SE
+  ilink <- family(gam_mod)$linkinv
+  out[, `:=`(fit_resp = ilink(pred), fit_upper_resp = ilink(pred + (2*se.fit)), fit_lower_resp = ilink(pred - (2*se.fit)))]
+  return(out)
+}
+
+
+#' @title creates plots of detection range curves from predicted model data
+#' @param dta predicted range curve data from model
+#' @param output output path and filename for figure
+#' @examples
+#' tar_load(predicted_rng_curve)
+#' dta <- predicted_rng_curve
+#' output = "output/range_curve.png"
+#' .rng_curve(dta, output)
+
+#' .rng_curve(dta = out, dp_data = dp_69st_mr, output = "output/test.png")
+
+
+#tar_load(dp_69st_mr)
+#dp_data = dp_69st_mr
+
+
+.rng_curve <- function(dta = predicted_range_curve_dta, dp_data = dp_69st_mr, output = "output/range_curve.png"){
+
+  tspan_min = min(dta$tbin_n)
+  tspan_max = max(dta$tbin_n)
+  foo <- dp_data
+#  foo <- dp_data[as.numeric(tbin) >= tspan_min & as.numeric(tbin) <= tspan_max,]
+  set(foo, j = "tbin", value = as.factor(as.POSIXct(foo$tbin, origin = "1970-01-01 00:00:00", tz = "UTC")))
+  set(dta, j = "tbin", value = as.factor(as.POSIXct(dta$tbin, origin = "1970-01-01 00:00:00", tz = "UTC")))
+  levels(dta$transmitter_instr_idF) <- c("32401, V13-L", "32402, V13-H", "32405, V13-L", "32406, V13-H")
+  levels(foo$transmitter_instr_idF) <- c("32401, V13-L", "32402, V13-H", "32405, V13-L", "32406, V13-H")
+  
+  p <- ggplot(data = dta, aes(x = rt_distance_m, y = fit_resp, group = tbin, colour = tbin)) +
+    scale_color_viridis(option = "inferno", discrete = TRUE) +
+    geom_line(size = 1.5) +
+  #    geom_line(aes(colour = as.factor(bin)), show.legend = FALSE) +
+    #    scale_color_viridis_d(option = "inferno") +
+    geom_ribbon(aes(ymin = fit_lower_resp, ymax = fit_upper_resp), colour = 'grey', alpha = 0.2, show.legend = TRUE) +
+    scale_x_continuous(breaks = seq(0,2000,100), limits = c(0,2000), expand = c(0,0)) +
+    scale_y_continuous(breaks = seq(0,1,0.2), limits = c(0,1), expand = c(0,0)) +
+    ylab("Tag transmission detection probability") +
+    xlab("Tag-receiver distance (m)") +
+    facet_wrap(. ~ transmitter_instr_idF) + theme_bw() +
+    #geom_hline(yintercept = c(0.5), color = c("red"), linetype = "dashed") +
+    geom_rug(data = foo[num_success == 1,], aes(x = rt_distance_m, y = num_success ), sides = "b", inherit.aes = FALSE, size = 0.8) +
+    geom_rug(data = foo[num_failure == 1,], aes(x = rt_distance_m, y = num_failure), sides = "t",  inherit.aes = FALSE, color = "red", size = 0.8) +
+    labs(color = "Date") +
+    theme(panel.spacing.x = unit(2, "lines"))
+     
+  ggsave(filename = output, plot = p, width = 16, height = 10)
+  return(output)
+  #return(p)
+}
 
 
 
