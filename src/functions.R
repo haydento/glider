@@ -3,17 +3,55 @@
 #' @description Function reads in file, cleans it up for further use
 #' @param in_pth file path to full data file.  must be *.csv
 #' @examples
-#' tar_load(full_glider_raw)
+#' tar_load(glider)
+#' in_pth = glider
 #' .load_glider(in_pth = full_glider_raw)
 
 .load_glider <- function(in_pth){
   dta <- fread(in_pth, na.strings = "NaN")
 
 
-old_names = c("time (UTC)", "latitude (degrees_north)", "longitude (degrees_east)", "depth (m)", "backscatter (m-1 sr-1)", "cdom (ppb)", "chlorophyll (ug/l)", "conductivity (S m-1)", "density (kg m-3)", "dissolved_oxygen (%)", "instrument_ctd (1)", "m_depth (meters)", "m_water_depth (m)", "platform_meta (1)", "precise_lat (degree_north)", "precise_lon (degree_east)", "precise_time (UTC)", "pressure (bar)", "rinkoii_temperature (Celsius)", "salinity (1)", "sci_flur_units (ppb)", "temperature (Celsius)", "u (m s-1)", "v (m s-1)")
+  old_names = c("time (UTC)",
+                "latitude (degrees_north)",
+                "longitude (degrees_east)",
+                "depth (m)",
+                "backscatter (m-1)",
+                "CDOM (ppb)",
+                "chlorophyll (ug l-1)",
+                "conductivity (S m-1)",
+                "density (kg m-3)",
+                "DO (1)",
+                "instrument_ctd (1)",
+                "platform_meta (1)",
+                "precise_lat (degrees_north)",
+                "precise_lon (degrees_east)",
+                "precise_time (UTC)",
+                "pressure (dbar)",
+                "salinity (1)",
+                "temperature (Celsius)",
+                "u (m s-1)",
+                "v (m s-1)")
 
-
-new_names = c("time_UTC", "latitude", "longitude", "depth_m", "backscatter_m-1_sr-1", "cdom_ppb", "chlorophyll_ug_l", "conductivity_S_m-1", "density_kg_m-3", "dissolved_oxygen_%", "instrument_ctd_1", "m_depth_m", "m_water_depth_m", "platform_meta_1", "precise_lat", "precise_lon", "precise_time_utc", "pressure_bar", "rinkoii_temperature_C", "salinity_1", "sci_flur_units_ppb", "temperature_C", "u_m_s-1", "v_m_s-1")  
+  new_names = c("time_UTC",
+                "latitude",
+                "longitude",
+                "depth_m",
+                "backscatter_m-1",
+                "cdom_ppb",
+                "chlorophyll_ug_l",
+                "conductivity_S_m-1",
+                "density_kg_m-3",
+                "dissolved_oxygen_%",
+                "instrument_ctd_1",
+                "platform_meta_1",
+                "precise_lat",
+                "precise_lon",
+                "precise_time_utc",
+                "pressure_dbar",
+                "salinity_1",
+                "temperature_C",
+                "u_m_s-1",
+                "v_m_s-1")  
   
   setnames(dta, old_names, new_names)
 
@@ -239,9 +277,7 @@ combine <- function(x,y,id){
 #' pth = "docs/index.html"
 #' v_pth = vps
 #'
-#' leaflet_map(glider_track = glider_trk, pth = "output/test.html", recs = "data/receiver_coords.fst")
-
-
+#' leaflet_map(glider_track = glider_limno, dtc = proc_dtc, log = hst, pth = "output/test.html")
 
 leaflet_map <- function(glider_track = glider_trk, 
                         dtc = vrl_vem_combined_dtc,
@@ -334,13 +370,13 @@ leaflet_map <- function(glider_track = glider_trk,
   m <- addPolylines(map = m, data = glider_SB, lng = ~precise_lon, lat = ~precise_lat, color = "green")
 
   m <- addCircleMarkers(map = m, data = dtc_180, lng = ~receiver_longitude, lat = ~receiver_latitude, color = ~color, radius = 9, stroke = FALSE, fillOpacity = 1, group = "180 kHz")
-  m <- addCircleMarkers(map = m, data = MBU1_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "180 kHz")
-  m <- addCircleMarkers(map = m, data = MBU2_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "180 kHz")
+  m <- addCircleMarkers(map = m, data = MBU1_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "180 kHz recs")
+  m <- addCircleMarkers(map = m, data = MBU2_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "180 kHz recs")
 
 
   m <- addCircleMarkers(map = m, data = dtc_69, lng = ~receiver_longitude, lat = ~receiver_latitude, color = ~color, radius = 9, stroke = FALSE, fillOpacity = 1, group = "69 kHz")
-  m <- addCircleMarkers(map = m, data = MBU1_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "69 kHz", label = "MBU-001 transmitter")
-  m <- addCircleMarkers(map = m, data = MBU2_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "69 kHz", label = "MBU-002 transmitter")
+  m <- addCircleMarkers(map = m, data = MBU1_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "69 kHz recs", label = "MBU-001 transmitter")
+  m <- addCircleMarkers(map = m, data = MBU2_recs, lng = ~longitude, lat = ~latitude, color = ~color, radius = ~radius, stroke = FALSE, fillOpacity = 1, group = "69 kHz recs", label = "MBU-002 transmitter")
   
 
 
@@ -370,7 +406,7 @@ leaflet_map <- function(glider_track = glider_trk,
   m <- leafem::addMouseCoordinates(m)
   m <- addMeasure(m, primaryLengthUnit = "meters", secondaryLengthUnit = "kilometers")  
   #  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("Tag-180-MBU1", "Tag-180-MBU2", "Tag-69-MBU1", "Tag-69-MBU2", "self-dtc,180", "self-dtc,69", "vps"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
-  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("self-dtc 180kHz", "self-dtc 69kHz", "180 kHz", "69 kHz"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
+  m <- addLayersControl(m, baseGroups = c("satellite", "nav chart", "alt"), overlayGroups = c("self-dtc 180kHz", "self-dtc 69kHz", "180 kHz", "69 kHz", "180 kHz recs", "69 kHz recs"),position = "bottomright", options = layersControlOptions(collapsed = FALSE))
 
   #m <- addLegend( map = m, pal = color_pal, values = ~HPEs, title = "HPE", opacity=1)
 

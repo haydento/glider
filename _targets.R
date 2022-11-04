@@ -8,36 +8,65 @@ source("src/vem.R")
 tar_option_set(packages = c("data.table", "leaflet", "leafem", "htmlwidgets", "leaflet.extras", "stringr", "geosphere", "leafem", "tarchetypes", "mgcv", "ggplot2", "viridis"))
 
 list(
-#-----------------------------
- #### 2022-10-24 import full processed glider data- 2021 glider data for HB. Data downloaded from IOOS DAC on 2022-10-24 from url- gliders.ioos.us.  Data for HB
- tar_target(
-   HB,
-   .load_glider("data/full_glider/marylou-20210920T1530_HB.csv"),
-   format = "fst_dt"
- ),
+#-------------------------
+ # 2021 glider data path to 2021 trial in HB. Data downloaded from IOOS DAC on 2022-10-24 from url- gliders.ioos.us.
+  tar_target(
+    HB_pth,
+    "data/full_glider/marylou-20210920T1530_HB.csv",
+    format = "file"
+  ),
 
-# 2021 glider data for SB.  Data downloaded from IOOS DAC on 2022-10-24 from url- gliders.ioos.us.  Data for SB.
- tar_target(
-  SB,
-  .load_glider("data/full_glider/cormorant-20211013T1655_SB.csv"),
-  format = "fst_dt"
- ),
+  # 2021 glider data path to 2021 trial in SB.  Data downloaded from IOOS DAC on 2022-10-24 from url- gliders.ioos.us
+  tar_target(
+    SB_pth,
+    "data/full_glider/cormorant-20211013T1655_SB.csv",
+    format = "file"
+  ),
 
-# combine both glider datasets into single object file.  This is environmental data from glider only.
- tar_target(
-   glider_limno,
-   rbind(HB, SB, idcol = "run", fill = TRUE),
-   format = "fst_dt"
- ),
- 
-#------------------------------------
-  # path to VEM data.  Confirmed on 2022-10-21, got vem files from cailin in email and all files are accounted for.  These are receiver detections from glider recs only.
+  # path to 2022 glider data in LCI area.  Data downloaded from IOOS DAC on 2022-11-2 from url- gliders.ioos.us
+  tar_target(
+    LCI,
+    "data/full_glider/mary_lou-20220818T1410_1d8c_613c_13ce.csv",
+    format = "file"
+    ),
+  
+  # path to instrument deployment/recovery locations and operating specs
+  tar_target(
+    instr_deploy_data,
+    "data/instr_deploy_log/gear_deployment_log.csv",
+    format = "file"
+  ),  
+  
+  # path to VEM data. got vem files from Cailin on 2022-10-21.  These are receiver detections from glider recs only for 2021 trials
   tar_target(
     vem_data,
     "data/vem",
     format = "file"
   ),
+ 
+#------------------------------------
 
+  # HB glider data
+  tar_target(
+    HB,
+    .load_glider(HB_pth)
+    format = "fst_dt"
+  ),
+
+  # 2021 glider data for SB.  Data downloaded from IOOS DAC on 2022-10-24 from url- gliders.ioos.us.
+  tar_target(
+    SB,
+    .load_glider(),
+    format = "fst_dt"
+  ),
+
+  # combine both glider datasets into single object file.  This is environmental data from glider only.
+  tar_target(
+    glider_limno,
+    rbind(HB, SB, idcol = "run", fill = TRUE),
+    format = "fst_dt"
+  ),
+ 
   # read VEM status files, parse, and clean-up
   # this object contains the receiver operating status info for the glider only, NO detections
   tar_target(
@@ -55,7 +84,7 @@ list(
    ),
  
  # read in vem detections from glider, use linear interpolation to estimate limnological data and location from glider sensors for glider detections.
- # Output is vem detection file with additional columns for glider limno data.
+ # Output is vem detection file with additional columns for interpolated glider limno data.
   tar_target(
     vem_dtc,
     infer_detection_locations_multi(i_cols = c("precise_lat", "precise_lon", "pressure_bar", "rinkoii_temperature_C", "salinity_1", "sci_flur_units_ppb", "temperature_C", "u_m_s-1", "v_m_s-1", "water_depth (m)" ), in_time = "precise_time_utc", pos = glider_limno, dtc = clean_vem_detections, dtc_timestamp = "datetime"),
@@ -69,13 +98,6 @@ list(
     format = "fst_dt"
     ),
     
-  # path to instrument deployment/recovery locations and operating specs
-  tar_target(
-    instr_deploy_data,
-    "data/instr_deploy_log/gear_deployment_log.csv",
-    format = "file"
-  ),  
-
   # detections from vrl and vem combined (this is for the full glider dataset)
   # "big joins"- joins receiver and tag location information with detection data and creates a "to-from" type dataset where tag transmissions are linked to receivers and each tag and receiver mooring type is included.  This is for the full glider dataset in 2021.
   # this dataset is the one used for detection range analyses
