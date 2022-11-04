@@ -8,3 +8,5 @@ docs/index_files/
 *~
 .DS_Store
 _targets/
+**/data
+**/output

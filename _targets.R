@@ -165,7 +165,8 @@ list(
  ),
 
   # renders summary document of detection. (output/dtc_summary.html)
-  # shows number of detections from STATIONARY tags detected by MOBILE glider
+ # shows number of detections from STATIONARY tags detected by MOBILE glider
+
   tar_render(dtc_summary, "src/dtc_table.rmd", output_dir = "output", output_file = "dtc_summary.html"),
 
   # prep detection summary document data
